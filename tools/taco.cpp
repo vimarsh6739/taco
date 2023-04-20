@@ -21,6 +21,7 @@
 #include "taco/codegen/module.h"
 #include "codegen/codegen_c.h"
 #include "codegen/codegen_cuda.h"
+#include "codegen/codegen_hydride.h"
 #include "codegen/codegen.h"
 #include "taco/util/strings.h"
 #include "taco/util/files.h"
@@ -33,6 +34,8 @@
 #include "taco/index_notation/index_notation_visitor.h"
 #include "taco/index_notation/index_notation_nodes.h"
 #include "taco/version.h"
+
+#include "taco/index_notation/index_notation_printer.h"
 
 using namespace std;
 using namespace taco;
@@ -1178,15 +1181,22 @@ int main(int argc, char* argv[]) {
   }
 
   Kernel kernel;
-  if (benchmark) {
+  if (benchmark || true) {
     if (time) cout << endl;
 
     shared_ptr<ir::Module> module(new ir::Module);
 
     TOOL_BENCHMARK_TIMER(
+      cout << "STMT: \n" << stmt << endl << endl;
+
       compute = lower(stmt, prefix+"compute",  computeWithAssemble, true);
+      cout << "COMP: \n" << compute << endl << endl;
+
       assemble = lower(stmt, prefix+"assemble", true, false);
+      cout << "ASSM: \n" << assemble << endl << endl;
+
       evaluate = lower(stmt, prefix+"evaluate", true, true);
+      cout << "EVAL: \n" << evaluate << endl << endl;
 
       module->addFunction(compute);
       module->addFunction(assemble);
@@ -1316,7 +1326,7 @@ int main(int argc, char* argv[]) {
   }
 
   bool hasPrinted = false;
-  std::shared_ptr<ir::CodeGen> codegen = ir::CodeGen::init_default(cout, ir::CodeGen::ImplementationGen);
+  std::shared_ptr<ir::CodeGen> codegen = ir::CodeGen::init_hydride(cout, ir::CodeGen::ImplementationGen);
   codegen->setColor(color);
   if (printAssemble) {
     if (assemble.defined()) {
@@ -1420,7 +1430,7 @@ int main(int argc, char* argv[]) {
     filestream << gentext << endl << "// ";
     printCommandLine(filestream, argc, argv);
     filestream << endl;
-    std::shared_ptr<ir::CodeGen> codegenFile = ir::CodeGen::init_default(filestream, ir::CodeGen::ImplementationGen);
+    std::shared_ptr<ir::CodeGen> codegenFile = ir::CodeGen::init_hydride(filestream, ir::CodeGen::ImplementationGen);
     codegenFile->compile(compute, false);
     filestream.close();
   }
@@ -1432,7 +1442,7 @@ int main(int argc, char* argv[]) {
     filestream << gentext << endl << "// ";
     printCommandLine(filestream, argc, argv);
     filestream << endl;
-    std::shared_ptr<ir::CodeGen> codegenFile = ir::CodeGen::init_default(filestream, ir::CodeGen::ImplementationGen);
+    std::shared_ptr<ir::CodeGen> codegenFile = ir::CodeGen::init_hydride(filestream, ir::CodeGen::ImplementationGen);
     codegenFile->compile(assemble, false);
     filestream.close();
   }
@@ -1445,7 +1455,7 @@ int main(int argc, char* argv[]) {
     printCommandLine(filestream, argc, argv);
     filestream << endl;
     std::shared_ptr<ir::CodeGen> codegenFile =
-        ir::CodeGen::init_default(filestream, ir::CodeGen::ImplementationGen);
+        ir::CodeGen::init_hydride(filestream, ir::CodeGen::ImplementationGen);
     bool hasPrinted = false;
 
     if (compute.defined() ) {

@@ -20,6 +20,9 @@ public:
   /// Initialize the default code generator
   static std::shared_ptr<CodeGen> init_default(std::ostream &dest, OutputKind outputKind);
 
+  /// Initialize the hydride code generator
+  static std::shared_ptr<CodeGen> init_hydride(std::ostream &dest, OutputKind outputKind);
+
   /// Compile a lowered function
   virtual void compile(Stmt stmt, bool isFirst=false) =0;
 
