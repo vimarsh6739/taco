@@ -120,8 +120,8 @@ protected:
   }
 };
 
-CodeGen_Hydride::CodeGen_Hydride(std::ostream &dest, OutputKind outputKind, bool simplify)
-    : CodeGen(dest, false, simplify, C), out(dest), outputKind(outputKind) {}
+CodeGen_Hydride::CodeGen_Hydride(std::ostream &dest)
+    : CodeGen(dest, false, true, C), out(dest), outputKind(ImplementationGen) {}
 
 CodeGen_Hydride::~CodeGen_Hydride() {}
 

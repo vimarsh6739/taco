@@ -1,2 +1,1 @@
-g++ -std=c++11 -O3 -DNDEBUG -DTACO -I ../include -L../build/lib sddmm.cpp -o sddmm -ltaco
-LD_LIBRARY_PATH=../build/lib ./sddmm
+Simple SDDMM example for testing hydride output via the taco tensor library.

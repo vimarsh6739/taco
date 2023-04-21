@@ -40,32 +40,6 @@
 using namespace std;
 using namespace taco;
 
-#define TOOL_BENCHMARK_REPEAT(CODE, NAME, REPEAT) {              \
-    if (time) {                                                  \
-      TACO_TIME_REPEAT(CODE,REPEAT,timevalue,false);             \
-      cout << NAME << " time (ms)" << endl << timevalue << endl; \
-    }                                                            \
-    else {                                                       \
-      CODE;                                                      \
-    }                                                            \
-}
-
-#define TOOL_BENCHMARK_TIMER(CODE,NAME,TIMER) {                  \
-    if (time) {                                                  \
-      taco::util::Timer timer;                                   \
-      timer.start();                                             \
-      CODE;                                                      \
-      timer.stop();                                              \
-      taco::util::TimeResults result = timer.getResult();        \
-      cout << NAME << " " << result << " ms" << endl;            \
-      TIMER=result;                                              \
-    }                                                            \
-    else {                                                       \
-      CODE;                                                      \
-    }                                                            \
-}
-
-
 static const string fileFormats = "(.tns .ttx .mtx .rb)";
 
 static int reportError(string errorMessage, int errorCode) {
@@ -1035,7 +1009,7 @@ int main(int argc, char* argv[]) {
   }
 
   bool hasPrinted = false;
-  std::shared_ptr<ir::CodeGen> codegen = ir::CodeGen::init_hydride(cout, ir::CodeGen::ImplementationGen);
+  std::shared_ptr<ir::CodeGen> codegen = ir::CodeGen::init_hydride(cout);
   codegen->setColor(color);
   if (printAssemble) {
     if (assemble.defined()) {
@@ -1131,7 +1105,7 @@ int main(int argc, char* argv[]) {
     filestream << gentext << endl << "// ";
     printCommandLine(filestream, argc, argv);
     filestream << endl;
-    std::shared_ptr<ir::CodeGen> codegenFile = ir::CodeGen::init_hydride(filestream, ir::CodeGen::ImplementationGen);
+    std::shared_ptr<ir::CodeGen> codegenFile = ir::CodeGen::init_hydride(filestream);
     codegenFile->compile(compute, false);
     filestream.close();
   }
@@ -1143,7 +1117,7 @@ int main(int argc, char* argv[]) {
     filestream << gentext << endl << "// ";
     printCommandLine(filestream, argc, argv);
     filestream << endl;
-    std::shared_ptr<ir::CodeGen> codegenFile = ir::CodeGen::init_hydride(filestream, ir::CodeGen::ImplementationGen);
+    std::shared_ptr<ir::CodeGen> codegenFile = ir::CodeGen::init_hydride(filestream);
     codegenFile->compile(assemble, false);
     filestream.close();
   }
@@ -1156,7 +1130,7 @@ int main(int argc, char* argv[]) {
     printCommandLine(filestream, argc, argv);
     filestream << endl;
     std::shared_ptr<ir::CodeGen> codegenFile =
-        ir::CodeGen::init_hydride(filestream, ir::CodeGen::ImplementationGen);
+        ir::CodeGen::init_hydride(filestream);
     bool hasPrinted = false;
 
     if (compute.defined() ) {

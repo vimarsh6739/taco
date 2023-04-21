@@ -256,7 +256,7 @@ class CodeGen_Hydride : public CodeGen {
 public:
   /// Initialize a code generator that generates code to an
   /// output stream.
-  CodeGen_Hydride(std::ostream &dest, OutputKind outputKind, bool simplify=true);
+  CodeGen_Hydride(std::ostream &dest);
   ~CodeGen_Hydride();
 
   /// Compile a lowered function

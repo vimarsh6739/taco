@@ -42,6 +42,8 @@ void Module::addFunction(Stmt func) {
 }
 
 void Module::compileToSource(string path, string prefix) {
+  std::cout << "ב" << std::endl;
+  std::cout << path << " " << prefix << std::endl;
   if (!moduleFromUserSource) {
   
     // create a codegen instance and add all the funcs
@@ -165,6 +167,25 @@ string Module::compile() {
   taco_uassert(lib_handle) << "Failed to load generated code, error is: " << dlerror();
 
   return fullpath;
+}
+
+std::string Module::emitHydride() {
+  std::cout << "ש" << std::endl;
+  string filepath = tmpdir + libname + ".rkt";
+  std::stringstream output;
+  output.str("");
+  output.clear();
+
+  std::shared_ptr<CodeGen> codegen = CodeGen::init_hydride(output);
+
+  for (auto func: funcs)
+    codegen->compile(func, true);
+
+  ofstream output_file;
+  output_file.open(filepath);
+  output_file << output.str();
+  output_file.close();
+  return filepath;
 }
 
 void Module::setSource(string source) {

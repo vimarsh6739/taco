@@ -32,8 +32,8 @@ shared_ptr<CodeGen> CodeGen::init_default(std::ostream &dest, OutputKind outputK
   }
 }
 
-shared_ptr<CodeGen> CodeGen::init_hydride(std::ostream &dest, OutputKind outputKind) {
-  return make_shared<CodeGen_Hydride>(dest, outputKind);
+shared_ptr<CodeGen> CodeGen::init_hydride(std::ostream &dest) {
+  return make_shared<CodeGen_Hydride>(dest);
 }
 
 int CodeGen::countYields(const Function *func) {

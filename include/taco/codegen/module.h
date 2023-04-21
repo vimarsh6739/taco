@@ -25,6 +25,9 @@ public:
   /// Compile the source into a library, returning its full path
   std::string compile();
   
+  /// Emit hydride IR code for synthesis in Rosette, returning the path to the output file.
+  std::string emitHydride();
+
   /// Compile the module into a source file located at the specified location
   /// path and prefix.  The generated source will be path/prefix.{.c|.bc, .h}
   void compileToSource(std::string path, std::string prefix);
