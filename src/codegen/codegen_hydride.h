@@ -97,7 +97,7 @@ namespace ir {
  *         string name;
  *         bool is_ptr;
  *         bool is_tensor;
- *         bool is_parameter; 
+ *         bool is_parameter;
  *       Neg
  *         Expr a;
  *       Sqrt
@@ -192,7 +192,7 @@ namespace ir {
  *         Stmt then;
  *         Stmt otherwise;
  *       Case  // A series of conditionals.
- *         vector<std::pair<Expr,Stmt>> clauses;
+ *         vector<pair<Expr,Stmt>> clauses;
  *         bool alwaysMatch;
  *       Switch  // A switch statement.
  *         vector<pair<Expr,Stmt>> cases;
