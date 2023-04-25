@@ -54,28 +54,34 @@ int main(int argc, char* argv[]) {
   IndexVar i, j, k;
   A(i,j) = B(i,j) * C(j,k);
 
+  // IndexVar i, j, k;
+  // A(i,j) = B(i,k) * C(k,j);
+
+  // Tensor<double> D({2,2}, rm);
+  // D(i,j) = A(i,j) + B(i,j);
+
   // At this point, we have defined how entries in the output matrix should be
   // computed from entries in the input matrices but have not actually performed
   // the computation yet. To do so, we must first tell taco to generate code that
   // can be executed to compute the SDDMM operation.
 
 
-  A.compile();
+  A.compile(true);
   std::cout << "done compiling" << std::endl;
 
-  std::string path = A.emitHydride();
-  std::cout << "emitted hydride @ " << path << std::endl;
+  // std::string path = A.emitHydride();
+  // std::cout << "emitted hydride @ " << path << std::endl;
 
   // std::cout << A.getSource() << std::endl;
 
 
   // We can now call the functions taco generated to assemble the indices of the
   // output matrix and then actually compute the SDDMM.
-  // A.assemble();
-  // std::cout << "done assembling" << std::endl;
+  A.assemble();
+  std::cout << "done assembling" << std::endl;
 
-  // A.compute();
-  // std::cout << "done computing" << std::endl;
+  A.compute();
+  std::cout << "done computing" << std::endl;
 
 
   // Write the output of the computation to file (stored in the Matrix Market format).

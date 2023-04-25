@@ -23,18 +23,18 @@ public:
   }
 
   /// Compile the source into a library, returning its full path
-  std::string compile();
+  std::string compile(bool emitHydride=false);
   
   /// Emit hydride IR code for synthesis in Rosette, returning the path to the output file.
   std::string emitHydride();
 
   /// Compile the module into a source file located at the specified location
   /// path and prefix.  The generated source will be path/prefix.{.c|.bc, .h}
-  void compileToSource(std::string path, std::string prefix);
+  void compileToSource(std::string path, std::string prefix, bool emitHydride=false);
   
   /// Compile the module into a static library located at the specified location
   /// path and prefix.  The generated library will be path/prefix.a
-  void compileToStaticLibrary(std::string path, std::string prefix);
+  void compileToStaticLibrary(std::string path, std::string prefix, bool emitHydride=false);
   
   /// Add a lowered function to this module */
   void addFunction(Stmt func);

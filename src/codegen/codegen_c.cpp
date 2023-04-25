@@ -6,10 +6,12 @@
 #include <taco.h>
 
 #include "taco/ir/ir_visitor.h"
+#include "taco/ir/simplify.h"
 #include "codegen_c.h"
 #include "taco/error.h"
 #include "taco/util/strings.h"
 #include "taco/util/collections.h"
+#include "rosette.h"
 
 using namespace std;
 
@@ -262,8 +264,8 @@ protected:
   }
 };
 
-CodeGen_C::CodeGen_C(std::ostream &dest, OutputKind outputKind, bool simplify)
-    : CodeGen(dest, false, simplify, C), out(dest), outputKind(outputKind) {}
+CodeGen_C::CodeGen_C(std::ostream &dest, OutputKind outputKind, bool simplify, bool emitHydride)
+    : CodeGen(dest, false, simplify, C), out(dest), outputKind(outputKind), emitHydride(emitHydride) {}
 
 CodeGen_C::~CodeGen_C() {}
 
@@ -328,8 +330,31 @@ void CodeGen_C::visit(const Function* func) {
         << endl;
   }
 
+  Stmt stmt = isa<Scope>(func->body) ? to<Scope>(func->body)->scopedStmt : func->body;
+
+  // Attempt simplification before running synthesis.
+  if (simplify) {
+    Stmt oldStmt;
+    do {
+      oldStmt = stmt;
+      stmt = ir::simplify(stmt);
+    } while (stmt != oldStmt);
+  }
+
+  // This is where we rewrite the body of the function to hydride for sythesis.
+  if (emitHydride) {
+    stmt = optimize_instructions_synthesis(stmt);
+    // update varmap
+
+    // find all expressions we want to synth
+    // output rosette code for each
+    // run synthesis on each
+    // replace with external function call
+    // output the ll files
+  }
+
   // output body
-  print(func->body);
+  print(stmt);
 
   // output repack only if we allocated memory
   if (checkForAlloc(func))

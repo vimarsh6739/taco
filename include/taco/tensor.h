@@ -420,9 +420,9 @@ public:
   void pack();
 
   /// Compile the tensor expression.
-  void compile();
+  void compile(bool emitHydride=false);
 
-  void compile(IndexStmt stmt, bool assembleWhileCompute=false);
+  void compile(IndexStmt stmt, bool assembleWhileCompute=false, bool emitHydride=false);
 
   /// Emit hydride IR code for synthesis in Rosette, returning the path.
   std::string emitHydride();

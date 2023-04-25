@@ -1009,7 +1009,7 @@ int main(int argc, char* argv[]) {
   }
 
   bool hasPrinted = false;
-  std::shared_ptr<ir::CodeGen> codegen = ir::CodeGen::init_hydride(cout);
+  std::shared_ptr<ir::CodeGen> codegen = ir::CodeGen::init_hydride(cout, ir::CodeGen::ImplementationGen);
   codegen->setColor(color);
   if (printAssemble) {
     if (assemble.defined()) {
@@ -1105,7 +1105,7 @@ int main(int argc, char* argv[]) {
     filestream << gentext << endl << "// ";
     printCommandLine(filestream, argc, argv);
     filestream << endl;
-    std::shared_ptr<ir::CodeGen> codegenFile = ir::CodeGen::init_hydride(filestream);
+    std::shared_ptr<ir::CodeGen> codegenFile = ir::CodeGen::init_hydride(filestream, ir::CodeGen::ImplementationGen);
     codegenFile->compile(compute, false);
     filestream.close();
   }
@@ -1117,7 +1117,7 @@ int main(int argc, char* argv[]) {
     filestream << gentext << endl << "// ";
     printCommandLine(filestream, argc, argv);
     filestream << endl;
-    std::shared_ptr<ir::CodeGen> codegenFile = ir::CodeGen::init_hydride(filestream);
+    std::shared_ptr<ir::CodeGen> codegenFile = ir::CodeGen::init_hydride(filestream, ir::CodeGen::ImplementationGen);
     codegenFile->compile(assemble, false);
     filestream.close();
   }
@@ -1130,7 +1130,7 @@ int main(int argc, char* argv[]) {
     printCommandLine(filestream, argc, argv);
     filestream << endl;
     std::shared_ptr<ir::CodeGen> codegenFile =
-        ir::CodeGen::init_hydride(filestream);
+        ir::CodeGen::init_hydride(filestream, ir::CodeGen::ImplementationGen);
     bool hasPrinted = false;
 
     if (compute.defined() ) {

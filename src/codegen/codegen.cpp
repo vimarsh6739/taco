@@ -28,12 +28,12 @@ shared_ptr<CodeGen> CodeGen::init_default(std::ostream &dest, OutputKind outputK
     return make_shared<CodeGen_CUDA>(dest, outputKind);
   }
   else {
-    return make_shared<CodeGen_C>(dest, outputKind);
+    return make_shared<CodeGen_C>(dest, outputKind, true, false);
   }
 }
 
-shared_ptr<CodeGen> CodeGen::init_hydride(std::ostream &dest) {
-  return make_shared<CodeGen_Hydride>(dest);
+shared_ptr<CodeGen> CodeGen::init_hydride(std::ostream &dest, OutputKind outputKind) {
+  return make_shared<CodeGen_C>(dest, outputKind, true, true);
 }
 
 int CodeGen::countYields(const Function *func) {

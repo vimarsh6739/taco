@@ -603,7 +603,7 @@ void TensorBase::cacheComputeKernel(const IndexStmt stmt,
   computeKernelsMutex.unlock();
 }
 
-void TensorBase::compile() {
+void TensorBase::compile(bool emitHydride) {
   Assignment assignment = getAssignment();
   taco_uassert(assignment.defined())
       << error::compile_without_expr;
@@ -639,10 +639,10 @@ void TensorBase::compile() {
   stmt = reorderLoopsTopologically(stmt);
   stmt = insertTemporaries(stmt);
   stmt = parallelizeOuterLoop(stmt);
-  compile(stmt, content->assembleWhileCompute);
+  compile(stmt, content->assembleWhileCompute, emitHydride);
 }
 
-void TensorBase::compile(taco::IndexStmt stmt, bool assembleWhileCompute) {
+void TensorBase::compile(taco::IndexStmt stmt, bool assembleWhileCompute, bool emitHydride) {
   if (!needsCompile()) {
     return;
   }
@@ -670,8 +670,7 @@ void TensorBase::compile(taco::IndexStmt stmt, bool assembleWhileCompute) {
   content->module = make_shared<Module>();
   content->module->addFunction(content->assembleFunc);
   content->module->addFunction(content->computeFunc);
-  std::cout << "א" << std::endl;
-  content->module->compile();
+  content->module->compile(emitHydride);
   cacheComputeKernel(concretizedAssign, content->module);
 }
 

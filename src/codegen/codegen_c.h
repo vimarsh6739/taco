@@ -15,7 +15,7 @@ class CodeGen_C : public CodeGen {
 public:
   /// Initialize a code generator that generates code to an
   /// output stream.
-  CodeGen_C(std::ostream &dest, OutputKind outputKind, bool simplify=true);
+  CodeGen_C(std::ostream &dest, OutputKind outputKind, bool simplify=true, bool emitHydride=true);
   ~CodeGen_C();
 
   /// Compile a lowered function
@@ -51,6 +51,7 @@ protected:
   std::string funcName;
   int labelCount;
   bool emittingCoroutine;
+  bool emitHydride;
 
   class FindVars;
 

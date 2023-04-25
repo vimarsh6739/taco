@@ -41,46 +41,87 @@ void Module::addFunction(Stmt func) {
   funcs.push_back(func);
 }
 
-void Module::compileToSource(string path, string prefix) {
-  std::cout << "ב" << std::endl;
+void Module::compileToSource(string path, string prefix, bool emitHydride) {
   std::cout << path << " " << prefix << std::endl;
-  if (!moduleFromUserSource) {
-  
-    // create a codegen instance and add all the funcs
-    bool didGenRuntime = false;
+  if (emitHydride){
+
+    if (!moduleFromUserSource) {
     
-    header.str("");
-    header.clear();
-    source.str("");
-    source.clear();
+      // create a codegen instance and add all the funcs
+      bool didGenRuntime = false;
+      
+      header.str("");
+      header.clear();
+      source.str("");
+      source.clear();
 
-    taco_tassert(target.arch == Target::C99) <<
-        "Only C99 codegen supported currently";
-    std::shared_ptr<CodeGen> sourcegen =
-        CodeGen::init_default(source, CodeGen::ImplementationGen);
-    std::shared_ptr<CodeGen> headergen =
-            CodeGen::init_default(header, CodeGen::HeaderGen);
+      taco_tassert(target.arch == Target::C99) <<
+          "Only C99 codegen supported currently";
+      std::shared_ptr<CodeGen> sourcegen =
+          CodeGen::init_hydride(source, CodeGen::ImplementationGen);
+      std::shared_ptr<CodeGen> headergen =
+              CodeGen::init_hydride(header, CodeGen::HeaderGen);
 
-    for (auto func: funcs) {
-      sourcegen->compile(func, !didGenRuntime);
-      headergen->compile(func, !didGenRuntime);
-      didGenRuntime = true;
+      for (auto func: funcs) {
+        sourcegen->compile(func, !didGenRuntime);
+        headergen->compile(func, !didGenRuntime);
+        didGenRuntime = true;
+      }
     }
-  }
 
-  ofstream source_file;
-  string file_ending = should_use_CUDA_codegen() ? ".cu" : ".c";
-  source_file.open(path+prefix+file_ending);
-  source_file << source.str();
-  source_file.close();
-  
-  ofstream header_file;
-  header_file.open(path+prefix+".h");
-  header_file << header.str();
-  header_file.close();
+    ofstream source_file;
+    string file_ending = should_use_CUDA_codegen() ? ".cu" : ".c";
+    source_file.open(path+prefix+file_ending);
+    source_file << source.str();
+    source_file.close();
+    
+    ofstream header_file;
+    header_file.open(path+prefix+".h");
+    header_file << header.str();
+    header_file.close();
+
+
+  } else {
+
+
+    if (!moduleFromUserSource) {
+    
+      // create a codegen instance and add all the funcs
+      bool didGenRuntime = false;
+      
+      header.str("");
+      header.clear();
+      source.str("");
+      source.clear();
+
+      taco_tassert(target.arch == Target::C99) <<
+          "Only C99 codegen supported currently";
+      std::shared_ptr<CodeGen> sourcegen =
+          CodeGen::init_default(source, CodeGen::ImplementationGen);
+      std::shared_ptr<CodeGen> headergen =
+              CodeGen::init_default(header, CodeGen::HeaderGen);
+
+      for (auto func: funcs) {
+        sourcegen->compile(func, !didGenRuntime);
+        headergen->compile(func, !didGenRuntime);
+        didGenRuntime = true;
+      }
+    }
+
+    ofstream source_file;
+    string file_ending = should_use_CUDA_codegen() ? ".cu" : ".c";
+    source_file.open(path+prefix+file_ending);
+    source_file << source.str();
+    source_file.close();
+    
+    ofstream header_file;
+    header_file.open(path+prefix+".h");
+    header_file << header.str();
+    header_file.close();
+  }
 }
 
-void Module::compileToStaticLibrary(string path, string prefix) {
+void Module::compileToStaticLibrary(string path, string prefix, bool emitHydride) {
   taco_tassert(false) << "Compiling to a static library is not supported";
 }
   
@@ -111,7 +152,7 @@ void writeShims(vector<Stmt> funcs, string path, string prefix) {
 
 } // anonymous namespace
 
-string Module::compile() {
+string Module::compile(bool emitHydride) {
   string prefix = tmpdir+libname;
   string fullpath = prefix + ".so";
   
@@ -149,13 +190,20 @@ string Module::compile() {
     "-o " + fullpath + " -lm";
 
   // open the output file & write out the source
-  compileToSource(tmpdir, libname);
+  compileToSource(tmpdir, libname, emitHydride);
   
   // write out the shims
   writeShims(funcs, tmpdir, libname);
   
   // now compile it
-  int err = system(cmd.data());
+  int err;
+  if (emitHydride) {
+    // do something
+    err = system(cmd.data());
+  } {
+    err = system(cmd.data());
+  }
+
   taco_uassert(err == 0) << "Compilation command failed:\n" << cmd
     << "\nreturned " << err;
 
@@ -176,7 +224,8 @@ std::string Module::emitHydride() {
   output.str("");
   output.clear();
 
-  std::shared_ptr<CodeGen> codegen = CodeGen::init_hydride(output);
+  std::shared_ptr<CodeGen> codegen = CodeGen::init_hydride(output, CodeGen::ImplementationGen);
+  // std::shared_ptr<CodeGen> codegen = CodeGen::init_default(output, CodeGen::ImplementationGen);
 
   for (auto func: funcs)
     codegen->compile(func, true);
