@@ -24,35 +24,42 @@ namespace {
 // Takes a Taco IR expression and converts it to Rosette syntax
 class HydrideEmitter : public IRVisitor {
  public:
-  HydrideEmitter(std::stringstream& stream) : stream(stream) {};
+  HydrideEmitter(std::stringstream& stream, std::string benchmark_name) : stream(stream), benchmark_name(benchmark_name) {};
 
-  void translate(Expr expr) {
+  void translate(const Expr* op, size_t expr_id) {
     varMap = {};
     localVars = {};
-    expr.accept(this);
+    // Clear LoadToRegMap, RegToLoadMap, RegToVariableMap, VariableToRegMap
+
+    emit_racket_imports();
+    stream << std::endl;
+    emit_racket_debug();
+    stream << std::endl;
+    emit_set_current_bitwidth();
+    stream << std::endl;
+    emit_set_memory_limit(20000);
+    stream << std::endl;
+    // rkt << HSE.emit_symbolic_buffers() << "\n"; // uses the maps
+    // rkt << HSE.emit_buffer_id_map("id-map") << "\n";
+
+    emit_expr(op);
+    stream << std::endl;
+    emit_hydride_synthesis(/* expr_depth */ 2, /* VF */ 0xcafebabe);
+    stream << std::endl;
+    emit_compile_to_llvm(expr_id);
+    stream << std::endl;
+    emit_write_synth_log_to_file(expr_id);
+    stream << std::endl;
   }
 
  protected:
   using IRVisitor::visit;
 
   std::stringstream& stream;
+  std::string benchmark_name;
 
   std::map<Expr, std::string, ExprCompare> varMap;
   std::vector<Expr> localVars;
-
-  void translate(const Expr* op) {
-    emit_racket_imports();
-    stream << std::endl;
-    emit_racket_debug();
-    stream << std::endl;
-
-    // rkt << HSE.emit_set_current_bitwidth() << "\n";
-    // rkt << HSE.emit_set_memory_limit(20000) << "\n";
-    // rkt << HSE.emit_symbolic_buffers() << "\n";
-    // rkt << HSE.emit_buffer_id_map("id-map") << "\n";
-
-    // IRVisitor::visit(op);
-  }
 
   void emit_racket_imports() {
     stream << "#lang rosette" << std::endl
@@ -68,6 +75,58 @@ class HydrideEmitter : public IRVisitor {
   void emit_racket_debug() {
     stream << ";; Uncomment the line below to enable verbose logging" << std::endl
            << "(enable-debug)" << std::endl;
+  }
+
+  void emit_set_current_bitwidth() {
+    const char* bitwidth = getenv("HL_SYNTH_BW");
+    if (bitwidth && stoi(bitwidth) > 0) {
+      stream << "(current-bitwidth " << stoi(bitwidth) << ")";
+    }
+  }
+
+  void emit_set_memory_limit(size_t mb) {
+    stream << "(custodian-limit-memory (current-custodian) (* " << mb << " 1024 1024))";
+  }
+
+  void emit_expr(const Expr* op) {
+    stream << "(define halide-expr " << std::endl;
+    op->accept(this);  // emit hydride for expression
+    stream << std::endl 
+           << ")" << std::endl << std::endl
+           << "(clear-vc!)" << std::endl;
+  }
+
+  void emit_hydride_synthesis(size_t expr_depth, size_t VF) {
+    stream << "(define synth-res "
+           << "(synthesize-halide-expr "
+           << "halide-expr" << " "  // expr_name
+           << "id-map" << " "  // id_map_name
+           << expr_depth << " "
+           << VF << " "
+           << "'z3" << " "  // solver
+           << "#t" << " "  // optimize
+           << "#f" << " "  // symbolic
+           << '"' << "" << '"' << " "  // synth_log_path
+           << '"' << "" << '"' << " "  // synth_log_name
+           << '"' << "x86" << '"' << ")"  // target
+           << ")" << std::endl
+           << "(dump-synth-res-with-typeinfo synth-res id-map)" << std::endl;
+  }
+
+  void emit_compile_to_llvm(size_t expr_id) {
+    stream << ";; Translate synthesized hydride-expression into LLVM-IR" << std::endl
+           << "(compile-to-llvm "
+           << "synth-res" << " "  // expr_name
+           << "id-map" << " "  // map_name
+           << '"' << "hydride_node_" << benchmark_name << "_" << expr_id << '"' << " "  // call_name
+           << '"' << benchmark_name << '"' << ")" << std::endl;  // bitcode_path
+    }
+
+  void emit_write_synth_log_to_file(size_t expr_id) {
+    stream << "(save-synth-map "
+           << '"' << "/tmp/hydride_hash_" << benchmark_name << "_" << expr_id << ".rkt" << '"' << " "  // fpath
+           << '"' << "synth_hash_" << benchmark_name << "_" << expr_id << '"' << " "  // hash_name
+           << "synth-log)";
   }
 
   void printBinaryOp(Expr a, Expr b, string bv_name) {
