@@ -27,6 +27,8 @@ class HydrideEmitter : public IRVisitor {
   HydrideEmitter(std::stringstream& stream, std::string benchmark_name) : stream(stream), benchmark_name(benchmark_name) {};
 
   void translate(const Expr* op, size_t expr_id, size_t vector_width) {
+    bitwidth = 512;
+
     emit_racket_imports();
     stream << std::endl;
     emit_racket_debug();
@@ -36,7 +38,7 @@ class HydrideEmitter : public IRVisitor {
     emit_set_memory_limit(20000);
     stream << std::endl;
 
-    emit_symbolic_buffers(/* bitwidth */ 512);
+    emit_symbolic_buffers();
     stream << std::endl;
     emit_buffer_id_map();
     stream << std::endl;
@@ -56,16 +58,15 @@ class HydrideEmitter : public IRVisitor {
 
   std::stringstream& stream;
   std::string benchmark_name;
+  size_t bitwidth;
 
   std::map<Expr, std::string, ExprCompare> varMap;
   std::vector<Expr> localVars;
 
-  // bimap between racket register expressions and taco load instructions
-  std::map<uint, const Load*> regToLoadMap;
+  // map from taco load instructions to racket registers
   std::map<const Load*, uint> loadToRegMap;
 
-  // bimap between racket register expressions and taco variables
-  std::map<uint, const Var*> regToVarMap;
+  // map from taco variables to racket registers
   std::map<const Var*, uint> varToRegMap;
 
   void emit_racket_imports() {
@@ -85,17 +86,14 @@ class HydrideEmitter : public IRVisitor {
   }
 
   void emit_set_current_bitwidth() {
-    const char* bitwidth = getenv("HL_SYNTH_BW");
-    if (bitwidth && stoi(bitwidth) > 0) {
-      stream << "(current-bitwidth " << stoi(bitwidth) << ")";
-    }
+    stream << "(current-bitwidth " << bitwidth << ")";
   }
 
   void emit_set_memory_limit(size_t mb) {
     stream << "(custodian-limit-memory (current-custodian) (* " << mb << " 1024 1024))";
   }
 
-  void emit_symbolic_buffer(size_t bitwidth, uint reg_num, Datatype type) {
+  void emit_symbolic_buffer(uint reg_num, Datatype type) {
     std::string reg_name = "reg_" + std::to_string(reg_num);
     // size_t bitwidth = item.first->type.bits() * item.first->type.lanes();
 
@@ -121,12 +119,12 @@ class HydrideEmitter : public IRVisitor {
     stream << "))" << std::endl;
   }
 
-  void emit_symbolic_buffers(size_t bitwidth) {
+  void emit_symbolic_buffers() {
     for (const auto& item : loadToRegMap)
-      emit_symbolic_buffer(bitwidth, item.second, item.first->type);
+      emit_symbolic_buffer(item.second, item.first->type);
     
     for (const auto& item : varToRegMap)
-      emit_symbolic_buffer(bitwidth, item.second, item.first->type);
+      emit_symbolic_buffer(item.second, item.first->type);
   }
 
   void emit_buffer_id_map() {
@@ -237,15 +235,24 @@ class HydrideEmitter : public IRVisitor {
   }
 
   void visit(const Var* op) {
+    // if op is skipnode, emit nothing
+
     // For Vars, we replace their names with the generated name, since we match by reference (not name)
     // taco_iassert(varMap.count(op) > 0) << "Var " << op->name << " not found in varMap";
-    // stream << "(<var> " << op->type << " " << varMap[op] << ")";
-    stream << "(<var> " << op->type << " " << op->name << ")";
+
+    if (varToRegMap.find(op) != varToRegMap.end()) {
+      stream << "reg_" << varToRegMap[op];
+    } else {
+      size_t reg_counter = varToRegMap.size() + loadToRegMap.size();
+      varToRegMap[op] = reg_counter;
+      stream << "reg_" << reg_counter;
+    }
   }
 
   void visit(const Neg* op) {
-    stream << "/* CodeGenHydride Neg */";
-    IRVisitor::visit(op);
+    stream << "(<neg> ";
+    op->a.accept(this);
+    stream << ")";
   }
 
   void visit(const Sqrt* op) {
@@ -277,7 +284,6 @@ class HydrideEmitter : public IRVisitor {
   }
 
   void visit(const Min* op) {
-    stream << "/* CodeGenHydride Min */";
     if (op->operands.size() == 1) {
       op->operands[0].accept(this);
     } else {
@@ -353,21 +359,31 @@ class HydrideEmitter : public IRVisitor {
   }
 
   void visit(const BinOp* op) {
-    stream << "/* CodeGenHydride BinOp */";
-    IRVisitor::visit(op);
+    stream << "(<binop> ";
+    op->a.accept(this);
+    stream << " ";
+    op->b.accept(this);
+    stream << ")";
   }
 
   void visit(const Cast* op) {
-    stream << "/* CodeGenHydride Cast */";
-    IRVisitor::visit(op);
+    stream << "(<cast> ";
+    op->a.accept(this);
+    stream << ")";
   }
 
   void visit(const Call* op) {
-    stream << "/* CodeGenHydride Call */";
-    IRVisitor::visit(op);
+    stream << "(<call> ";
+    for (auto& arg : op->args) {
+      stream << " ";
+      arg.accept(this);
+    }
+    stream << ")";
   }
 
   void visit(const Load* op) {
+
+
     stream << "(<load> ";
     op->arr.accept(this);
     stream << " ";
