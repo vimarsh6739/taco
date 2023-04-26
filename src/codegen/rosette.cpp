@@ -26,11 +26,7 @@ class HydrideEmitter : public IRVisitor {
  public:
   HydrideEmitter(std::stringstream& stream, std::string benchmark_name) : stream(stream), benchmark_name(benchmark_name) {};
 
-  void translate(const Expr* op, size_t expr_id) {
-    varMap = {};
-    localVars = {};
-    // Clear LoadToRegMap, RegToLoadMap, RegToVariableMap, VariableToRegMap
-
+  void translate(const Expr* op, size_t expr_id, size_t vector_width) {
     emit_racket_imports();
     stream << std::endl;
     emit_racket_debug();
@@ -39,12 +35,15 @@ class HydrideEmitter : public IRVisitor {
     stream << std::endl;
     emit_set_memory_limit(20000);
     stream << std::endl;
-    // rkt << HSE.emit_symbolic_buffers() << "\n"; // uses the maps
-    // rkt << HSE.emit_buffer_id_map("id-map") << "\n";
+
+    emit_symbolic_buffers(/* bitwidth */ 512);
+    stream << std::endl;
+    emit_buffer_id_map();
+    stream << std::endl;
 
     emit_expr(op);
     stream << std::endl;
-    emit_hydride_synthesis(/* expr_depth */ 2, /* VF */ 0xcafebabe);
+    emit_hydride_synthesis(/* expr_depth */ 3, /* VF */ vector_width);
     stream << std::endl;
     emit_compile_to_llvm(expr_id);
     stream << std::endl;
@@ -60,6 +59,14 @@ class HydrideEmitter : public IRVisitor {
 
   std::map<Expr, std::string, ExprCompare> varMap;
   std::vector<Expr> localVars;
+
+  // bimap between racket register expressions and taco load instructions
+  std::map<uint, const Load*> regToLoadMap;
+  std::map<const Load*, uint> loadToRegMap;
+
+  // bimap between racket register expressions and taco variables
+  std::map<uint, const Var*> regToVarMap;
+  std::map<const Var*, uint> varToRegMap;
 
   void emit_racket_imports() {
     stream << "#lang rosette" << std::endl
@@ -86,6 +93,53 @@ class HydrideEmitter : public IRVisitor {
 
   void emit_set_memory_limit(size_t mb) {
     stream << "(custodian-limit-memory (current-custodian) (* " << mb << " 1024 1024))";
+  }
+
+  void emit_symbolic_buffer(size_t bitwidth, uint reg_num, Datatype type) {
+    std::string reg_name = "reg_" + std::to_string(reg_num);
+    // size_t bitwidth = item.first->type.bits() * item.first->type.lanes();
+
+    stream << "(define " << reg_name << "_bitvector (bv 0 (bitvector " << bitwidth << ")))" << std::endl
+           << "(define " << reg_name << " (halide:create-buffer " << reg_name << "_bitvector '";
+    
+    int bits = type.getNumBits();
+    if (type.isUInt())
+      stream << "uint" << bits;
+    if (type.isInt())
+      stream << "int" << bits;
+    if (type.isFloat()) {
+      switch (bits) {
+        case 32:
+          stream << "float";
+        case 64:
+          stream << "double";  
+        default:
+          stream << "float" << bits;
+      }
+    }
+    
+    stream << "))" << std::endl;
+  }
+
+  void emit_symbolic_buffers(size_t bitwidth) {
+    for (const auto& item : loadToRegMap)
+      emit_symbolic_buffer(bitwidth, item.second, item.first->type);
+    
+    for (const auto& item : varToRegMap)
+      emit_symbolic_buffer(bitwidth, item.second, item.first->type);
+  }
+
+  void emit_buffer_id_map() {
+    stream << ";; Creating a map between buffers and halide call node arguments" << std::endl
+           << "(define " << "id-map" << " (make-hash))" << std::endl;  // map_name
+
+    for (const auto& item : loadToRegMap) {
+      stream << "(hash-set! " << "id-map" << " reg_" << item.second << " (bv " << item.second << " (bitvector 8)))" << std::endl;
+    }
+
+    for (const auto& item : varToRegMap) {
+      stream << "(hash-set! " << "id-map" << " reg_" << item.second << " (bv " << item.second << " (bitvector 8)))" << std::endl;
+    }
   }
 
   void emit_expr(const Expr* op) {
@@ -353,7 +407,9 @@ class LoadRewriter : public IRRewriter {
     IRRewriter::visit(op);
     string varName = "temp_load_" + std::to_string(tempVarCount++);
     decls.emplace_back(varName, expr);
+    std::cout << "HI: " << expr << std::endl;
     expr = Var::make(varName, expr.type());
+    std::cout << "HI: " << expr << std::endl;
   }
 
   void visit(const Store* op) override {
@@ -582,14 +638,14 @@ Stmt optimize_instructions_synthesis(Stmt stmt) {
   std::cout << "ס" << std::endl;
   IRPrinter printer(std::cout);
 
-  // stmt = LoadRewriter().rewrite(stmt);
+  stmt = LoadRewriter().rewrite(stmt);
 
   
   std::cout << "REWRITTEN" << endl;
-  // printer.print(stmt);
+  printer.print(stmt);
 
 
-  // stmt = IROptimizer().rewrite(stmt);
+  stmt = IROptimizer().rewrite(stmt);
 
   return stmt;
 
