@@ -5,15 +5,17 @@ int main(int argc, char* argv[]) {
     for(int i=0;i<64;++i)
     {
         a[i] = i+1;
-        b[i] = i+1;
+        b[i] = 2*(i+1);
     }
 
     for(int i=0;i<64;i+=4){
-        Sum_vect(c,a,b,i);
+        Sum_vect_4(c,a,b,i);
     }
 
-    for(int i=0;i<10;++i){
-        printf("%d: %d",i,c[i]);
+    for(int i=0;i<64;++i){
+        int value;
+        value = get_index(c,i);
+        printf("%d: %d\n",i,value);
     }
 
     return 0;
