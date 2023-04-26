@@ -213,7 +213,6 @@ protected:
   using IRVisitor::visit;
 
   virtual void visit(const Var *op) {
-    // std::cout << "Visiting Var: " << op->name << std::endl;
     if (varMap.count(op) == 0) {
       varMap[op] = op->is_ptr? op->name : codeGen->genUniqueName(op->name);
     }
@@ -223,7 +222,6 @@ protected:
     if (!util::contains(localVars, op->var)) {
       localVars.push_back(op->var);
     }
-    // std::cout << "ISA VAR? " << isa<Var>(op->var) << std::endl;
     op->var.accept(this);
     op->rhs.accept(this);
   }
@@ -285,209 +283,96 @@ void CodeGen_C::compile(Stmt stmt, bool isFirst) {
 }
 
 void CodeGen_C::visit(const Function* func) {
-  if(emitHydride){
-
-    // if generating a header, protect the function declaration with a guard
-    if (outputKind == HeaderGen) {
-      out << "#ifndef TACO_GENERATED_" << func->name << "\n";
-      out << "#define TACO_GENERATED_" << func->name << "\n";
-    }
-
-    int numYields = countYields(func);
-    emittingCoroutine = (numYields > 0);
-    funcName = func->name;
-    labelCount = 0;
-
-    resetUniqueNameCounters();
-    FindVars inputVarFinder(func->inputs, {}, this);
-    func->body.accept(&inputVarFinder);
-
-    // std::cout << "inputVarFinder" << std::endl;
-    // for(auto x:inputVarFinder.varMap){
-    //   std::cout << "\t" << x.first << ':' << x.second << std::endl;
-    // }
-
-    FindVars outputVarFinder({}, func->outputs, this);
-    func->body.accept(&outputVarFinder);
-
-    // std::cout << "outputVarFinder" << std::endl;
-    // for(auto x:outputVarFinder.varMap){
-    //   std::cout << "\t" << x.first << ':' << x.second << std::endl;
-    // }
-
-    // output function declaration
-    doIndent();
-    out << printFuncName(func, inputVarFinder.varDecls, outputVarFinder.varDecls);
-    if(outputKind==ImplementationGen){
-      std::cout << printFuncName(func, inputVarFinder.varDecls, outputVarFinder.varDecls) << std::endl;
-      std::cout << std::endl;
-    }
-
-    // if we're just generating a header, this is all we need to do
-    if (outputKind == HeaderGen) {
-      out << ";\n";
-      out << "#endif\n";
-      return;
-    }
-
-    out << " {\n";
-
-    indent++;
-
-    // Stmt stmt = isa<Scope>(func->body) ? to<Scope>(func->body)->scopedStmt : func->body;
-
-    // Attempt simplification before running synthesis.
-    // if (simplify) {
-    //   Stmt oldStmt;
-    //   do {
-    //     oldStmt = stmt;
-    //     stmt = ir::simplify(stmt);
-    //   } while (stmt != oldStmt);
-    // }
-
-    // This is where we rewrite the body of the function to hydride for sythesis.
-    if (emitHydride) {
-      // stmt = optimize_instructions_synthesis(stmt);
-      // update varmap
-
-      // find all expressions we want to synth
-      // output rosette code for each
-      // run synthesis on each
-      // replace with external function call
-      // output the ll files
-    }
-
-    // std::cout << "\nCODEGEN (1): " << std::endl;
-    // IRPrinter printer(std::cout);
-    // printer.print(stmt);
-
-    // find all the vars that are not inputs or outputs and declare them
-    resetUniqueNameCounters();
-    FindVars varFinder(func->inputs, func->outputs, this);
-    func->body.accept(&varFinder);
-    varMap = varFinder.varMap;
-    // std::cout << "VarMap: " << std::endl;
-    // for (auto const& x : varMap) {
-    //   std::cout << "\t" << x.first << ':' << x.second << std::endl;
-    // }
-
-    localVars = varFinder.localVars;
-    // std::cout << "LocalVars: " << std::endl;
-    // for (auto const& x : localVars) {
-    //   std::cout << "\t" << x << std::endl;
-    // }
-    
-    // Print variable declarations
-    out << printDecls(varFinder.varDecls, func->inputs, func->outputs) << endl;
-
-    if (emittingCoroutine) {
-      out << printContextDeclAndInit(varMap, localVars, numYields, func->name)
-          << endl;
-    }
-
-    // std::cout << "\nCODEGEN (2): " << std::endl;
-    // printer.print(stmt);
-
-    // output body
-    print(func->body);
-
-    // std::cout << "\nCODEGEN (3): " << std::endl;
-    // printer.print(stmt);
-
-    // std::cout << "\nCODEGEN (4): " << std::endl;
-    // printer.print(stmt);
-
-    // output repack only if we allocated memory
-    if (checkForAlloc(func))
-      out << endl << printPack(varFinder.outputProperties, func->outputs);
-
-    if (emittingCoroutine) {
-      out << printCoroutineFinish(numYields, funcName);
-    }
-
-    doIndent();
-    out << "return 0;\n";
-    indent--;
-
-    doIndent();
-    out << "}\n";
-
-    if(outputKind == ImplementationGen){
-      std::cout << "FINISHED CODE GENERATION FOR FUNCTION :: " << func->name << std::endl;
-    }
+  // if generating a header, protect the function declaration with a guard
+  if (outputKind == HeaderGen) {
+    out << "#ifndef TACO_GENERATED_" << func->name << "\n";
+    out << "#define TACO_GENERATED_" << func->name << "\n";
   }
-  else{
-    // if generating a header, protect the function declaration with a guard
-    if (outputKind == HeaderGen) {
-      out << "#ifndef TACO_GENERATED_" << func->name << "\n";
-      out << "#define TACO_GENERATED_" << func->name << "\n";
-    }
 
-    int numYields = countYields(func);
-    emittingCoroutine = (numYields > 0);
-    funcName = func->name;
-    labelCount = 0;
+  int numYields = countYields(func);
+  emittingCoroutine = (numYields > 0);
+  funcName = func->name;
+  labelCount = 0;
 
-    resetUniqueNameCounters();
-    FindVars inputVarFinder(func->inputs, {}, this);
-    func->body.accept(&inputVarFinder);
+  resetUniqueNameCounters();
+  FindVars inputVarFinder(func->inputs, {}, this);
+  func->body.accept(&inputVarFinder);
+  FindVars outputVarFinder({}, func->outputs, this);
+  func->body.accept(&outputVarFinder);
 
-    FindVars outputVarFinder({}, func->outputs, this);
-    func->body.accept(&outputVarFinder);
+  // output function declaration
+  doIndent();
+  out << printFuncName(func, inputVarFinder.varDecls, outputVarFinder.varDecls);
 
-    // output function declaration
-    doIndent();
-    out << printFuncName(func, inputVarFinder.varDecls, outputVarFinder.varDecls);
-
-    // if we're just generating a header, this is all we need to do
-    if (outputKind == HeaderGen) {
-      out << ";\n";
-      out << "#endif\n";
-      return;
-    }
-
-    out << " {\n";
-
-    indent++;
-
-    // find all the vars that are not inputs or outputs and declare them
-    resetUniqueNameCounters();
-    FindVars varFinder(func->inputs, func->outputs, this);
-    func->body.accept(&varFinder);
-    varMap = varFinder.varMap;
-
-    localVars = varFinder.localVars;
-    
-    // Print variable declarations
-    out << printDecls(varFinder.varDecls, func->inputs, func->outputs) << endl;
-
-    if (emittingCoroutine) {
-      out << printContextDeclAndInit(varMap, localVars, numYields, func->name)
-          << endl;
-    }
-
-    // output body
-    print(func->body);
-
-    // output repack only if we allocated memory
-    if (checkForAlloc(func))
-      out << endl << printPack(varFinder.outputProperties, func->outputs);
-
-    if (emittingCoroutine) {
-      out << printCoroutineFinish(numYields, funcName);
-    }
-
-    doIndent();
-    out << "return 0;\n";
-    indent--;
-
-    doIndent();
-    out << "}\n";
+  // if we're just generating a header, this is all we need to do
+  if (outputKind == HeaderGen) {
+    out << ";\n";
+    out << "#endif\n";
+    return;
   }
+
+  out << " {\n";
+
+  indent++;
+
+  // find all the vars that are not inputs or outputs and declare them
+  resetUniqueNameCounters();
+  FindVars varFinder(func->inputs, func->outputs, this);
+  func->body.accept(&varFinder);
+  varMap = varFinder.varMap;
+  localVars = varFinder.localVars;
+
+  // Print variable declarations
+  out << printDecls(varFinder.varDecls, func->inputs, func->outputs) << endl;
+
+  if (emittingCoroutine) {
+    out << printContextDeclAndInit(varMap, localVars, numYields, func->name)
+        << endl;
+  }
+
+  Stmt stmt = isa<Scope>(func->body) ? to<Scope>(func->body)->scopedStmt : func->body;
+
+  // Attempt simplification before running synthesis.
+  if (simplify) {
+    Stmt oldStmt;
+    do {
+      oldStmt = stmt;
+      stmt = ir::simplify(stmt);
+    } while (stmt != oldStmt);
+  }
+
+  // This is where we rewrite the body of the function to hydride for sythesis.
+  if (emitHydride) {
+    stmt = optimize_instructions_synthesis(stmt);
+    // update varmap
+
+    // find all expressions we want to synth
+    // output rosette code for each
+    // run synthesis on each
+    // replace with external function call
+    // output the ll files
+  }
+
+  // output body
+  print(stmt);
+
+  // output repack only if we allocated memory
+  if (checkForAlloc(func))
+    out << endl << printPack(varFinder.outputProperties, func->outputs);
+
+  if (emittingCoroutine) {
+    out << printCoroutineFinish(numYields, funcName);
+  }
+
+  doIndent();
+  out << "return 0;\n";
+  indent--;
+
+  doIndent();
+  out << "}\n";
 }
 
 void CodeGen_C::visit(const VarDecl* op) {
-  // std::cout << "VarDecl: " << op->var << std::endl;
   if (emittingCoroutine) {
     doIndent();
     op->var.accept(this);
@@ -587,7 +472,6 @@ void CodeGen_C::visit(const For* op) {
       }
       break;
   }
-  // (xBroadcast (int-imm (bv 2 16)) 8)
 
   doIndent();
   stream << keywordString("for") << " (";

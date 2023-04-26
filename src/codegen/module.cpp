@@ -100,7 +100,6 @@ void Module::compileToSource(string path, string prefix, bool emitHydride) {
       std::shared_ptr<CodeGen> headergen =
               CodeGen::init_default(header, CodeGen::HeaderGen);
 
-
       for (auto func: funcs) {
         sourcegen->compile(func, !didGenRuntime);
         headergen->compile(func, !didGenRuntime);

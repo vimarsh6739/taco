@@ -485,9 +485,7 @@ string CodeGen::genUniqueName(string name) {
   } else {
     uniqueNameCounters[name] = 0;
   }
-  string s = os.str();
-  // std::cout << "UNIQ: " << name << ":" << s << std::endl;
-  return s;
+  return os.str();
 }
 
 static vector<const GetProperty*> sortProps(std::map<Expr, std::string, ExprCompare> map) {
