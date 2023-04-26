@@ -14,7 +14,6 @@
 #include "taco/util/env.h"
 #include "codegen/codegen_c.h"
 #include "codegen/codegen_cuda.h"
-#include "codegen/codegen_hydride.h"
 #include "taco/cuda.h"
 
 using namespace std;
@@ -42,7 +41,7 @@ void Module::addFunction(Stmt func) {
 }
 
 void Module::compileToSource(string path, string prefix, bool emitHydride) {
-  std::cout << path << " " << prefix << std::endl;
+  std::cout << "Writing generated C file to:" << path << "" << prefix << ".c" << std::endl;
   if (emitHydride){
 
     if (!moduleFromUserSource) {
@@ -100,6 +99,7 @@ void Module::compileToSource(string path, string prefix, bool emitHydride) {
           CodeGen::init_default(source, CodeGen::ImplementationGen);
       std::shared_ptr<CodeGen> headergen =
               CodeGen::init_default(header, CodeGen::HeaderGen);
+
 
       for (auto func: funcs) {
         sourcegen->compile(func, !didGenRuntime);

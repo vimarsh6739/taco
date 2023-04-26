@@ -2,7 +2,6 @@
 #include "taco/cuda.h"
 #include "codegen_cuda.h"
 #include "codegen_c.h"
-#include "codegen_hydride.h"
 #include <algorithm>
 #include <unordered_set>
 
@@ -486,7 +485,9 @@ string CodeGen::genUniqueName(string name) {
   } else {
     uniqueNameCounters[name] = 0;
   }
-  return os.str();
+  string s = os.str();
+  // std::cout << "UNIQ: " << name << ":" << s << std::endl;
+  return s;
 }
 
 static vector<const GetProperty*> sortProps(std::map<Expr, std::string, ExprCompare> map) {

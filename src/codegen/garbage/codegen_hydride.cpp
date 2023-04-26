@@ -6,8 +6,7 @@
 #include <taco.h>
 
 #include "taco/ir/ir_visitor.h"
-#include "taco/ir/simplify.h"
-#include "codegen_c.h"
+#include "codegen_hydride.h"
 #include "taco/error.h"
 #include "taco/util/strings.h"
 #include "taco/util/collections.h"
@@ -168,7 +167,7 @@ const string cHeaders =
 
 // find variables for generating declarations
 // generates a single var for each GetProperty
-class CodeGen_C::FindVars : public IRVisitor {
+class CodeGen_Hydride::FindVars : public IRVisitor {
 public:
   map<Expr, string, ExprCompare> varMap;
 
@@ -188,10 +187,10 @@ public:
   vector<Expr> outputTensors;
   vector<Expr> inputTensors;
 
-  CodeGen_C *codeGen;
+  CodeGen_Hydride *codeGen;
 
   // copy inputs and outputs into the map
-  FindVars(vector<Expr> inputs, vector<Expr> outputs, CodeGen_C *codeGen)
+  FindVars(vector<Expr> inputs, vector<Expr> outputs, CodeGen_Hydride *codeGen)
   : codeGen(codeGen) {
     for (auto v: inputs) {
       auto var = v.as<Var>();
@@ -213,7 +212,6 @@ protected:
   using IRVisitor::visit;
 
   virtual void visit(const Var *op) {
-    // std::cout << "Visiting Var: " << op->name << std::endl;
     if (varMap.count(op) == 0) {
       varMap[op] = op->is_ptr? op->name : codeGen->genUniqueName(op->name);
     }
@@ -223,7 +221,6 @@ protected:
     if (!util::contains(localVars, op->var)) {
       localVars.push_back(op->var);
     }
-    // std::cout << "ISA VAR? " << isa<Var>(op->var) << std::endl;
     op->var.accept(this);
     op->rhs.accept(this);
   }
@@ -266,12 +263,12 @@ protected:
   }
 };
 
-CodeGen_C::CodeGen_C(std::ostream &dest, OutputKind outputKind, bool simplify, bool emitHydride)
-    : CodeGen(dest, false, simplify, C), out(dest), outputKind(outputKind), emitHydride(emitHydride) {}
+CodeGen_Hydride::CodeGen_Hydride(std::ostream &dest, OutputKind outputKind, bool simplify)
+    : CodeGen(dest, false, simplify, C), out(dest), outputKind(outputKind) {}
 
-CodeGen_C::~CodeGen_C() {}
+CodeGen_Hydride::~CodeGen_Hydride() {}
 
-void CodeGen_C::compile(Stmt stmt, bool isFirst) {
+void CodeGen_Hydride::compile(Stmt stmt, bool isFirst) {
   varMap = {};
   localVars = {};
 
@@ -284,210 +281,74 @@ void CodeGen_C::compile(Stmt stmt, bool isFirst) {
   stmt.accept(this);
 }
 
-void CodeGen_C::visit(const Function* func) {
-  if(emitHydride){
-
-    // if generating a header, protect the function declaration with a guard
-    if (outputKind == HeaderGen) {
-      out << "#ifndef TACO_GENERATED_" << func->name << "\n";
-      out << "#define TACO_GENERATED_" << func->name << "\n";
-    }
-
-    int numYields = countYields(func);
-    emittingCoroutine = (numYields > 0);
-    funcName = func->name;
-    labelCount = 0;
-
-    resetUniqueNameCounters();
-    FindVars inputVarFinder(func->inputs, {}, this);
-    func->body.accept(&inputVarFinder);
-
-    // std::cout << "inputVarFinder" << std::endl;
-    // for(auto x:inputVarFinder.varMap){
-    //   std::cout << "\t" << x.first << ':' << x.second << std::endl;
-    // }
-
-    FindVars outputVarFinder({}, func->outputs, this);
-    func->body.accept(&outputVarFinder);
-
-    // std::cout << "outputVarFinder" << std::endl;
-    // for(auto x:outputVarFinder.varMap){
-    //   std::cout << "\t" << x.first << ':' << x.second << std::endl;
-    // }
-
-    // output function declaration
-    doIndent();
-    out << printFuncName(func, inputVarFinder.varDecls, outputVarFinder.varDecls);
-    if(outputKind==ImplementationGen){
-      std::cout << printFuncName(func, inputVarFinder.varDecls, outputVarFinder.varDecls) << std::endl;
-      std::cout << std::endl;
-    }
-
-    // if we're just generating a header, this is all we need to do
-    if (outputKind == HeaderGen) {
-      out << ";\n";
-      out << "#endif\n";
-      return;
-    }
-
-    out << " {\n";
-
-    indent++;
-
-    // Stmt stmt = isa<Scope>(func->body) ? to<Scope>(func->body)->scopedStmt : func->body;
-
-    // Attempt simplification before running synthesis.
-    // if (simplify) {
-    //   Stmt oldStmt;
-    //   do {
-    //     oldStmt = stmt;
-    //     stmt = ir::simplify(stmt);
-    //   } while (stmt != oldStmt);
-    // }
-
-    // This is where we rewrite the body of the function to hydride for sythesis.
-    if (emitHydride) {
-      // stmt = optimize_instructions_synthesis(stmt);
-      // update varmap
-
-      // find all expressions we want to synth
-      // output rosette code for each
-      // run synthesis on each
-      // replace with external function call
-      // output the ll files
-    }
-
-    // std::cout << "\nCODEGEN (1): " << std::endl;
-    // IRPrinter printer(std::cout);
-    // printer.print(stmt);
-
-    // find all the vars that are not inputs or outputs and declare them
-    resetUniqueNameCounters();
-    FindVars varFinder(func->inputs, func->outputs, this);
-    func->body.accept(&varFinder);
-    varMap = varFinder.varMap;
-    // std::cout << "VarMap: " << std::endl;
-    // for (auto const& x : varMap) {
-    //   std::cout << "\t" << x.first << ':' << x.second << std::endl;
-    // }
-
-    localVars = varFinder.localVars;
-    // std::cout << "LocalVars: " << std::endl;
-    // for (auto const& x : localVars) {
-    //   std::cout << "\t" << x << std::endl;
-    // }
-    
-    // Print variable declarations
-    out << printDecls(varFinder.varDecls, func->inputs, func->outputs) << endl;
-
-    if (emittingCoroutine) {
-      out << printContextDeclAndInit(varMap, localVars, numYields, func->name)
-          << endl;
-    }
-
-    // std::cout << "\nCODEGEN (2): " << std::endl;
-    // printer.print(stmt);
-
-    // output body
-    print(func->body);
-
-    // std::cout << "\nCODEGEN (3): " << std::endl;
-    // printer.print(stmt);
-
-    // std::cout << "\nCODEGEN (4): " << std::endl;
-    // printer.print(stmt);
-
-    // output repack only if we allocated memory
-    if (checkForAlloc(func))
-      out << endl << printPack(varFinder.outputProperties, func->outputs);
-
-    if (emittingCoroutine) {
-      out << printCoroutineFinish(numYields, funcName);
-    }
-
-    doIndent();
-    out << "return 0;\n";
-    indent--;
-
-    doIndent();
-    out << "}\n";
-
-    if(outputKind == ImplementationGen){
-      std::cout << "FINISHED CODE GENERATION FOR FUNCTION :: " << func->name << std::endl;
-    }
+void CodeGen_Hydride::visit(const Function* func) {
+  // if generating a header, protect the function declaration with a guard
+  if (outputKind == HeaderGen) {
+    out << "#ifndef TACO_GENERATED_" << func->name << "\n";
+    out << "#define TACO_GENERATED_" << func->name << "\n";
   }
-  else{
-    // if generating a header, protect the function declaration with a guard
-    if (outputKind == HeaderGen) {
-      out << "#ifndef TACO_GENERATED_" << func->name << "\n";
-      out << "#define TACO_GENERATED_" << func->name << "\n";
-    }
 
-    int numYields = countYields(func);
-    emittingCoroutine = (numYields > 0);
-    funcName = func->name;
-    labelCount = 0;
+  int numYields = countYields(func);
+  emittingCoroutine = (numYields > 0);
+  funcName = func->name;
+  labelCount = 0;
 
-    resetUniqueNameCounters();
-    FindVars inputVarFinder(func->inputs, {}, this);
-    func->body.accept(&inputVarFinder);
+  resetUniqueNameCounters();
+  FindVars inputVarFinder(func->inputs, {}, this);
+  func->body.accept(&inputVarFinder);
+  FindVars outputVarFinder({}, func->outputs, this);
+  func->body.accept(&outputVarFinder);
 
-    FindVars outputVarFinder({}, func->outputs, this);
-    func->body.accept(&outputVarFinder);
+  // output function declaration
+  doIndent();
+  out << printFuncName(func, inputVarFinder.varDecls, outputVarFinder.varDecls);
 
-    // output function declaration
-    doIndent();
-    out << printFuncName(func, inputVarFinder.varDecls, outputVarFinder.varDecls);
-
-    // if we're just generating a header, this is all we need to do
-    if (outputKind == HeaderGen) {
-      out << ";\n";
-      out << "#endif\n";
-      return;
-    }
-
-    out << " {\n";
-
-    indent++;
-
-    // find all the vars that are not inputs or outputs and declare them
-    resetUniqueNameCounters();
-    FindVars varFinder(func->inputs, func->outputs, this);
-    func->body.accept(&varFinder);
-    varMap = varFinder.varMap;
-
-    localVars = varFinder.localVars;
-    
-    // Print variable declarations
-    out << printDecls(varFinder.varDecls, func->inputs, func->outputs) << endl;
-
-    if (emittingCoroutine) {
-      out << printContextDeclAndInit(varMap, localVars, numYields, func->name)
-          << endl;
-    }
-
-    // output body
-    print(func->body);
-
-    // output repack only if we allocated memory
-    if (checkForAlloc(func))
-      out << endl << printPack(varFinder.outputProperties, func->outputs);
-
-    if (emittingCoroutine) {
-      out << printCoroutineFinish(numYields, funcName);
-    }
-
-    doIndent();
-    out << "return 0;\n";
-    indent--;
-
-    doIndent();
-    out << "}\n";
+  // if we're just generating a header, this is all we need to do
+  if (outputKind == HeaderGen) {
+    out << ";\n";
+    out << "#endif\n";
+    return;
   }
+
+  out << " {\n";
+
+  indent++;
+
+  // find all the vars that are not inputs or outputs and declare them
+  resetUniqueNameCounters();
+  FindVars varFinder(func->inputs, func->outputs, this);
+  func->body.accept(&varFinder);
+  varMap = varFinder.varMap;
+  localVars = varFinder.localVars;
+
+  // Print variable declarations
+  out << printDecls(varFinder.varDecls, func->inputs, func->outputs) << endl;
+
+  if (emittingCoroutine) {
+    out << printContextDeclAndInit(varMap, localVars, numYields, func->name)
+        << endl;
+  }
+
+  // output body
+  print(func->body);
+
+  // output repack only if we allocated memory
+  if (checkForAlloc(func))
+    out << endl << printPack(varFinder.outputProperties, func->outputs);
+
+  if (emittingCoroutine) {
+    out << printCoroutineFinish(numYields, funcName);
+  }
+
+  doIndent();
+  out << "return 0;\n";
+  indent--;
+
+  doIndent();
+  out << "}\n";
 }
 
-void CodeGen_C::visit(const VarDecl* op) {
-  // std::cout << "VarDecl: " << op->var << std::endl;
+void CodeGen_Hydride::visit(const VarDecl* op) {
   if (emittingCoroutine) {
     doIndent();
     op->var.accept(this);
@@ -501,13 +362,13 @@ void CodeGen_C::visit(const VarDecl* op) {
   }
 }
 
-void CodeGen_C::visit(const Yield* op) {
+void CodeGen_Hydride::visit(const Yield* op) {
   printYield(op, localVars, varMap, labelCount, funcName);
 }
 
 // For Vars, we replace their names with the generated name,
 // since we match by reference (not name)
-void CodeGen_C::visit(const Var* op) {
+void CodeGen_Hydride::visit(const Var* op) {
   taco_iassert(varMap.count(op) > 0) <<
       "Var " << op->name << " not found in varMap";
   if (emittingCoroutine) {
@@ -565,7 +426,7 @@ static string getAtomicPragma() {
 //
 // Docs for vectorization pragmas:
 // http://clang.llvm.org/docs/LanguageExtensions.html#extensions-for-loop-hint-optimizations
-void CodeGen_C::visit(const For* op) {
+void CodeGen_Hydride::visit(const For* op) {
   switch (op->kind) {
     case LoopKind::Vectorized:
       doIndent();
@@ -587,7 +448,6 @@ void CodeGen_C::visit(const For* op) {
       }
       break;
   }
-  // (xBroadcast (int-imm (bv 2 16)) 8)
 
   doIndent();
   stream << keywordString("for") << " (";
@@ -622,7 +482,7 @@ void CodeGen_C::visit(const For* op) {
   stream << endl;
 }
 
-void CodeGen_C::visit(const While* op) {
+void CodeGen_Hydride::visit(const While* op) {
   // it's not clear from documentation that clang will vectorize
   // while loops
   // however, we'll output the pragmas anyway
@@ -635,13 +495,13 @@ void CodeGen_C::visit(const While* op) {
   IRPrinter::visit(op);
 }
 
-void CodeGen_C::visit(const GetProperty* op) {
+void CodeGen_Hydride::visit(const GetProperty* op) {
   taco_iassert(varMap.count(op) > 0) <<
       "Property " << Expr(op) << " of " << op->tensor << " not found in varMap";
   out << varMap[op];
 }
 
-void CodeGen_C::visit(const Min* op) {
+void CodeGen_Hydride::visit(const Min* op) {
   if (op->operands.size() == 1) {
     op->operands[0].accept(this);
     return;
@@ -658,7 +518,7 @@ void CodeGen_C::visit(const Min* op) {
   }
 }
 
-void CodeGen_C::visit(const Max* op) {
+void CodeGen_Hydride::visit(const Max* op) {
   if (op->operands.size() == 1) {
     op->operands[0].accept(this);
     return;
@@ -674,7 +534,7 @@ void CodeGen_C::visit(const Max* op) {
   }
 }
 
-void CodeGen_C::visit(const Allocate* op) {
+void CodeGen_Hydride::visit(const Allocate* op) {
   string elementType = printCType(op->var.type(), false);
 
   doIndent();
@@ -705,7 +565,7 @@ void CodeGen_C::visit(const Allocate* op) {
     stream << endl;
 }
 
-void CodeGen_C::visit(const Sqrt* op) {
+void CodeGen_Hydride::visit(const Sqrt* op) {
   taco_tassert(op->type.isFloat() && op->type.getNumBits() == 64) <<
       "Codegen doesn't currently support non-double sqrt";
   stream << "sqrt(";
@@ -713,7 +573,7 @@ void CodeGen_C::visit(const Sqrt* op) {
   stream << ")";
 }
 
-void CodeGen_C::visit(const Assign* op) {
+void CodeGen_Hydride::visit(const Assign* op) {
   if (op->use_atomics) {
     doIndent();
     stream << getAtomicPragma() << endl;
@@ -721,7 +581,7 @@ void CodeGen_C::visit(const Assign* op) {
   IRPrinter::visit(op);
 }
 
-void CodeGen_C::visit(const Store* op) {
+void CodeGen_Hydride::visit(const Store* op) {
   if (op->use_atomics) {
     doIndent();
     stream << getAtomicPragma() << endl;
@@ -729,7 +589,7 @@ void CodeGen_C::visit(const Store* op) {
   IRPrinter::visit(op);
 }
 
-void CodeGen_C::generateShim(const Stmt& func, stringstream &ret) {
+void CodeGen_Hydride::generateShim(const Stmt& func, stringstream &ret) {
   const Function *funcPtr = func.as<Function>();
 
   ret << "int _shim_" << funcPtr->name << "(void** parameterPack) {\n";

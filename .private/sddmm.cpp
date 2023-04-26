@@ -13,9 +13,9 @@ int main(int argc, char* argv[]) {
   // and (optionally) the order in which dimensions should be stored. The formats
   // declared below correspond to doubly compressed sparse row (dcsr), row-major
   // dense (rm), and column-major dense (dm).
-  Format dcsr({Dense,Dense});
-  Format   rm({Dense,Dense});
-  Format   cm({Dense,Dense}, {1,0});
+  // Format dcsr({Dense,Dense});
+  Format   rm({Dense});
+  // Format   cm({Dense,Dense}, {1,0});
 
   // Load a sparse matrix from file (stored in the Matrix Market format) and
   // store it as a doubly compressed sparse row matrix. Matrices correspond to
@@ -25,13 +25,11 @@ int main(int argc, char* argv[]) {
 
 //   Tensor<double> B = read("webbase-1M/webbase-1M.mtx", dcsr);
   // Generate a random dense matrix and store it in row-major (dense) format.
-  Tensor<double> C({2, 2}, rm);
-  Tensor<double> B({2,2},rm);
+  Tensor<int> C({4}, rm);
+  Tensor<int> B({4},rm);
   for (int i = 0; i < C.getDimension(0); ++i) {
-    for (int j = 0; j < C.getDimension(1); ++j) {
-      C.insert({i,j}, unif(gen));
-      B.insert({i,j},unif(gen));
-    }
+    C.insert({i}, i + 1);
+    B.insert({i}, i + 1);
   }
   B.pack();
   C.pack();
@@ -48,11 +46,11 @@ int main(int argc, char* argv[]) {
 
   // Declare the output matrix to be a sparse matrix with the same dimensions as
   // input matrix B, to be also stored as a doubly compressed sparse row matrix.
-  Tensor<double> A({2,2}, rm);
+  Tensor<int> A({4}, rm);
 
   // Define the SDDMM computation using index notation.
-  IndexVar i, j, k;
-  A(i,j) = B(i,j) * C(j,k);
+  IndexVar i;
+  A(i) = B(i) + C(i);
 
   // IndexVar i, j, k;
   // A(i,j) = B(i,k) * C(k,j);
@@ -66,7 +64,9 @@ int main(int argc, char* argv[]) {
   // can be executed to compute the SDDMM operation.
 
 
-  A.compile(true);
+  A.parallelize(i,CPUVector);
+
+  A.compile(false);
   std::cout << "done compiling" << std::endl;
 
   // std::string path = A.emitHydride();
@@ -85,5 +85,5 @@ int main(int argc, char* argv[]) {
 
 
   // Write the output of the computation to file (stored in the Matrix Market format).
-  write("A.mtx", A);
+  // write("A.mtx", A);
 }

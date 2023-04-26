@@ -40,7 +40,6 @@
 
 #include "codegen/codegen_c.h"
 #include "codegen/codegen_cuda.h"
-#include "codegen/codegen_hydride.h"
 #include "error/error_checks.h"
 #include "taco/cuda.h"
 #include "lower/iteration_graph.h"

@@ -294,9 +294,7 @@ class LoadRewriter : public IRRewriter {
     IRRewriter::visit(op);
     string varName = "temp_load_" + std::to_string(tempVarCount++);
     decls.emplace_back(varName, expr);
-    std::cout << "HI: " << expr << std::endl;
     expr = Var::make(varName, expr.type());
-    std::cout << "HI: " << expr << std::endl;
   }
 
   void visit(const Store* op) override {
@@ -525,14 +523,14 @@ Stmt optimize_instructions_synthesis(Stmt stmt) {
   std::cout << "ס" << std::endl;
   IRPrinter printer(std::cout);
 
-  stmt = LoadRewriter().rewrite(stmt);
+  // stmt = LoadRewriter().rewrite(stmt);
 
   
   std::cout << "REWRITTEN" << endl;
-  printer.print(stmt);
+  // printer.print(stmt);
 
 
-  stmt = IROptimizer().rewrite(stmt);
+  // stmt = IROptimizer().rewrite(stmt);
 
   return stmt;
 
