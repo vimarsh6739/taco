@@ -64,7 +64,7 @@ int main(int argc, char* argv[]) {
   // can be executed to compute the SDDMM operation.
 
 
-  A.parallelize(i,CPUVector);
+  // A.parallelize(i,CPUVector);
 
   A.compile(false);
   std::cout << "done compiling" << std::endl;
