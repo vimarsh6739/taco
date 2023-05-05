@@ -21,12 +21,14 @@ namespace ir {
 // Some helper functions
 namespace {
 
-// Takes a Taco IR expression and converts it to Rosette syntax
 class HydrideEmitter : public IRVisitor {
- public:
-  HydrideEmitter(std::stringstream& stream, std::string benchmark_name) : stream(stream), benchmark_name(benchmark_name) {};
+  // Visits a Taco IR expression and converts it to a hydride IR expression.
+  // This is done in Rosette syntax.
 
-  void translate(const Expr* op, size_t expr_id, size_t vector_width) {
+ public:
+  HydrideEmitter(std::ostream& stream) : stream(stream) {};
+
+  void translate(const Expr* op, std::string benchmark_name, size_t expr_id, size_t vector_width) {
     bitwidth = 512;
 
     emit_racket_imports();
@@ -47,17 +49,18 @@ class HydrideEmitter : public IRVisitor {
     stream << std::endl;
     emit_hydride_synthesis(/* expr_depth */ 3, /* VF */ vector_width);
     stream << std::endl;
-    emit_compile_to_llvm(expr_id);
+    emit_compile_to_llvm(benchmark_name, expr_id);
     stream << std::endl;
-    emit_write_synth_log_to_file(expr_id);
+    emit_write_synth_log_to_file(benchmark_name, expr_id);
     stream << std::endl;
   }
 
  protected:
   using IRVisitor::visit;
 
-  std::stringstream& stream;
+  std::ostream& stream;
   std::string benchmark_name;
+  size_t expr_count;
   size_t bitwidth;
 
   std::map<Expr, std::string, ExprCompare> varMap;
@@ -141,7 +144,7 @@ class HydrideEmitter : public IRVisitor {
   }
 
   void emit_expr(const Expr* op) {
-    stream << "(define halide-expr " << std::endl;
+    stream << "(define halide-expr " << std::endl << "\t";
     op->accept(this);  // emit hydride for expression
     stream << std::endl 
            << ")" << std::endl << std::endl
@@ -165,7 +168,7 @@ class HydrideEmitter : public IRVisitor {
            << "(dump-synth-res-with-typeinfo synth-res id-map)" << std::endl;
   }
 
-  void emit_compile_to_llvm(size_t expr_id) {
+  void emit_compile_to_llvm(std::string benchmark_name, size_t expr_id) {
     stream << ";; Translate synthesized hydride-expression into LLVM-IR" << std::endl
            << "(compile-to-llvm "
            << "synth-res" << " "  // expr_name
@@ -174,7 +177,7 @@ class HydrideEmitter : public IRVisitor {
            << '"' << benchmark_name << '"' << ")" << std::endl;  // bitcode_path
     }
 
-  void emit_write_synth_log_to_file(size_t expr_id) {
+  void emit_write_synth_log_to_file(std::string benchmark_name, size_t expr_id) {
     stream << "(save-synth-map "
            << '"' << "/tmp/hydride_hash_" << benchmark_name << "_" << expr_id << ".rkt" << '"' << " "  // fpath
            << '"' << "synth_hash_" << benchmark_name << "_" << expr_id << '"' << " "  // hash_name
@@ -382,7 +385,8 @@ class HydrideEmitter : public IRVisitor {
   }
 
   void visit(const Load* op) {
-
+    // insert skipnodes for predicate and index???
+    
 
     stream << "(<load> ";
     op->arr.accept(this);
@@ -483,7 +487,8 @@ class LoadRewriter : public IRRewriter {
 
 };
 
-class IROptimizer : public IRRewriter {
+class ExprOptimizer : public IRRewriter {
+  // Visits a Taco loop body and optimizes each expression.
 
   // Expr rewrite(Expr e) override {
   //   return e;
@@ -491,152 +496,177 @@ class IROptimizer : public IRRewriter {
 
  protected:
   using IRRewriter::visit;
-
-  /** 
-   * Mutation steps:
-   * 
-   * If the expression produces an output of float type, ignore it
-   * If the expression produces an output of boolean type, ignore it
-   * Ignore some qualifying but trivial expressions to reduce noise in the results
-   * If the expression is just a single load instruction, ignore it
-   * If the expression is just a single ramp instruction, ignore it
-   * If the expression is just a variable, ignore it
-   * 
-   */
+  size_t expr_count = 0;
 
   // Helper function for all valid expressions
-  // void rewriteExpr(const ExprNode* op) {
-  //   std::cout << "<אקספר>";
-  // }
-  
+  Expr synthExpr(Expr op) {
+    std::cout << "<אקספר>" << op << std::endl;
+
+    /** 
+     * Mutation steps:
+     * 
+     * If the expression produces an output of float type, ignore it
+     * If the expression produces an output of boolean type, ignore it
+     * Ignore some qualifying but trivial expressions to reduce noise in the results
+     */
+
+    std::string benchmark_name = "hydride";
+    size_t expr_id = expr_count++;
+    std::string file_name = "taco_expr_" + benchmark_name + "_" + std::to_string(expr_id) + ".rkt";
+
+    std::ofstream ostream;
+    ostream.open(file_name);
+    HydrideEmitter(ostream).translate(&op, benchmark_name, expr_id, /* vector_width */ 1);
+    ostream.close();
+    std::cout << "Wrote racket code to file @ " << file_name << std::endl;
+
+    return op;
+  }
+
   void visit(const Neg* op) override {
-    IRRewriter::visit(op);
     std::cout << "<Neg>";
-    // rewriteExpr(op);
+    expr = synthExpr(op);
   }
   
   void visit(const Sqrt* op) override {
-    IRRewriter::visit(op);
     std::cout << "<Sqrt>";
+    expr = synthExpr(op);
   }
   
   void visit(const Add* op) override {
-    IRRewriter::visit(op);
     std::cout << "<Add>";
+    expr = synthExpr(op);
   }
   
   void visit(const Sub* op) override {
-    IRRewriter::visit(op);
     std::cout << "<Sub>";
+    expr = synthExpr(op);
   }
   
   void visit(const Mul* op) override {
-    IRRewriter::visit(op);
     std::cout << "<Mul>";
+    expr = synthExpr(op);
   }
   
   void visit(const Div* op) override {
-    IRRewriter::visit(op);
     std::cout << "<Div>";
+    expr = synthExpr(op);
   }
   
   void visit(const Rem* op) override {
-    IRRewriter::visit(op);
     std::cout << "<Rem>";
+    expr = synthExpr(op);
   }
   
   void visit(const Min* op) override {
-    IRRewriter::visit(op);
     std::cout << "<Min>";
+    expr = synthExpr(op);
   }
   
   void visit(const Max* op) override {
-    IRRewriter::visit(op);
     std::cout << "<Max>";
+    expr = synthExpr(op);
   }
   
   void visit(const BitAnd* op) override {
-    IRRewriter::visit(op);
     std::cout << "<BitAnd>";
+    expr = synthExpr(op);
   }
   
   void visit(const BitOr* op) override {
-    IRRewriter::visit(op);
     std::cout << "<BitOr>";
+    expr = synthExpr(op);
   }
   
   void visit(const Eq* op) override {
-    IRRewriter::visit(op);
     std::cout << "<Eq>";
+    expr = synthExpr(op);
   }
   
   void visit(const Neq* op) override {
-    IRRewriter::visit(op);
     std::cout << "<Neq>";
+    expr = synthExpr(op);
   }
   
   void visit(const Gt* op) override {
-    IRRewriter::visit(op);
     std::cout << "<אקספר>";
+    expr = synthExpr(op);
   }
   
   void visit(const Lt* op) override {
-    IRRewriter::visit(op);
     std::cout << "<Lt>";
+    expr = synthExpr(op);
   }
   
   void visit(const Gte* op) override {
-    IRRewriter::visit(op);
     std::cout << "<Gte>";
+    expr = synthExpr(op);
   }
   
   void visit(const Lte* op) override {
-    IRRewriter::visit(op);
     std::cout << "<Lte>";
+    expr = synthExpr(op);
   }
   
   void visit(const And* op) override {
-    IRRewriter::visit(op);
     std::cout << "<And>";
+    expr = synthExpr(op);
   }
   
   void visit(const Or* op) override {
-    IRRewriter::visit(op);
     std::cout << "<Or>";
+    expr = synthExpr(op);
   }
   
   void visit(const BinOp* op) override {
-    IRRewriter::visit(op);
     std::cout << "<BinOp>";
+    expr = synthExpr(op);
   }
   
-  //???
   void visit(const Cast* op) override {
-    IRRewriter::visit(op);
     std::cout << "<Cast>";
-  }
-  
-  void visit(const Load* op) override {
-    IRRewriter::visit(op);
-    std::cout << "<Load>";
-  }
-  
-  void visit(const Malloc* op) override {
-    IRRewriter::visit(op);
-    std::cout << "<Malloc>";
-  }
-  
-  void visit(const Sizeof* op) override {
-    IRRewriter::visit(op);
-    std::cout << "<Sizeof>";
-  }
-  
-  void visit(const GetProperty* op) override {
-    IRRewriter::visit(op);
-    std::cout << "<GetProperty>";
+    expr = synthExpr(op);
   }
 
 };
+
+class LoopDetector : public IRVisitor {
+  // Visits a Taco IR for loop and returns whether there is a inner loop.
+ public:
+  LoopDetector() : found(false) {};
+
+  bool visit(const Stmt& op) {
+    op.accept(this);
+    return found;
+  }
+
+ protected:
+  using IRVisitor::visit;
+  bool found;
+
+  void visit(const For* op) { found = true; }
+  void visit(const While* op) { found = true; }
+};
+
+class LoopOptimizer : public IRRewriter {
+  // Visits a Taco IR function and identifies the candidates for synthesis.
+
+ protected:
+  using IRRewriter::visit;
+  ExprOptimizer expr_optimizer;
+
+  void visit(const For* op) {
+    // If this is not the innermost loop, keep traversing
+    if (LoopDetector().visit(op->contents))
+      return IRRewriter::visit(op);
+    
+    // Check if the loop is vectorizable??? todo: implement
+    IRPrinter(std::cout).print(op->contents);
+    expr_optimizer.rewrite(op->contents);
+  }
+};
+
+
 
 } // anonymous namespace
 
@@ -654,15 +684,10 @@ Stmt optimize_instructions_synthesis(Stmt stmt) {
   std::cout << "ס" << std::endl;
   IRPrinter printer(std::cout);
 
-  stmt = LoadRewriter().rewrite(stmt);
+  // stmt = LoadRewriter().rewrite(stmt);
+  // stmt = IROptimizer().rewrite(stmt);
 
-  
-  std::cout << "REWRITTEN" << endl;
-  printer.print(stmt);
-
-
-  stmt = IROptimizer().rewrite(stmt);
-
+  LoopOptimizer().rewrite(stmt);
   return stmt;
 
   // IROptimizer().rewrite(stmt);

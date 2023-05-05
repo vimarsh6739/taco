@@ -662,6 +662,18 @@ Stmt Switch::make(std::vector<std::pair<Expr,Stmt>> cases, Expr controlExpr) {
   return sw;
 }
 
+std::ostream& operator<<(std::ostream& out, const LoopKind kind) {
+  switch (kind) {
+    case LoopKind::Serial:           return out << "Serial";
+    case LoopKind::Static:           return out << "Static";
+    case LoopKind::Dynamic:          return out << "Dynamic";
+    case LoopKind::Runtime:          return out << "Runtime";
+    case LoopKind::Vectorized:       return out << "Vectorized";
+    case LoopKind::Static_Chunked:   return out << "Static_Chunked";
+    default:                         return out << "Invalid";
+  }
+}
+
 // For loop
 Stmt For::make(Expr var, Expr start, Expr end, Expr increment, Stmt body,
   LoopKind kind, ParallelUnit parallel_unit, size_t unrollFactor, int vec_width) {

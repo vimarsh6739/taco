@@ -8,67 +8,82 @@ using namespace taco;
 int main(int argc, char* argv[]) {
   std::default_random_engine gen(0);
   std::uniform_real_distribution<double> unif(0.0, 1.0);
-  
   // Predeclare the storage formats that the inputs and output will be stored as.
   // To define a format, you must specify whether each dimension is dense or sparse
   // and (optionally) the order in which dimensions should be stored. The formats
   // declared below correspond to doubly compressed sparse row (dcsr), row-major
   // dense (rm), and column-major dense (dm).
-  Format dcsr({Sparse,Sparse});
-  Format   rm({Dense,Dense});
-  Format   cm({Dense,Dense}, {1,0});
+  // Format dcsr({Dense,Dense});
+  Format   rm({Dense});
+  // Format   cm({Dense,Dense}, {1,0});
 
   // Load a sparse matrix from file (stored in the Matrix Market format) and
   // store it as a doubly compressed sparse row matrix. Matrices correspond to
   // order-2 tensors in taco. The matrix in this example can be download from:
   // https://www.cise.ufl.edu/research/sparse/MM/Williams/webbase-1M.tar.gz
-  Tensor<int32_t> B({10, 10}, dcsr);
-  B.insert({1, 2}, 1);
-  B.insert({1, 3}, 1);
-  B.insert({1, 4}, 1);
-  B.insert({1, 5}, 1);
-  B.insert({2, 5}, 1);
-  B.insert({3, 3}, 1);
-  B.insert({4, 4}, 1);
-  B.insert({5, 5}, 1);
-  B.insert({8, 8}, 1);
-  B.insert({8, 9}, 1);
+    std::cout << "done preloading" << std::endl;
 
+//   Tensor<double> B = read("webbase-1M/webbase-1M.mtx", dcsr);
   // Generate a random dense matrix and store it in row-major (dense) format.
-  Tensor<int32_t> C({B.getDimension(0), 10}, rm);
+  Tensor<int> C({4}, rm);
+  Tensor<int> B({4},rm);
   for (int i = 0; i < C.getDimension(0); ++i) {
-    for (int j = 0; j < C.getDimension(1); ++j) {
-      C.insert({i,j}, static_cast<int>(unif(gen) * 2));
-    }
+    C.insert({i}, i + 1);
+    B.insert({i}, i + 1);
   }
+  B.pack();
   C.pack();
+  std::cout << "done loading" << std::endl;
 
-  // Generate another random dense matrix and store it in column-major format.
-  Tensor<int32_t> D({10, B.getDimension(1)}, cm);
-  for (int i = 0; i < D.getDimension(0); ++i) {
-    for (int j = 0; j < D.getDimension(1); ++j) {
-      D.insert({i,j}, static_cast<int>(unif(gen) * 2));
-    }
-  }
-  D.pack();
+//   // Generate another random dense matrix and store it in column-major format.
+//   Tensor<double> D({2, B.getDimension(1)}, rm);
+//   for (int i = 0; i < D.getDimension(0); ++i) {
+//     for (int j = 0; j < D.getDimension(1); ++j) {
+//       D.insert({i,j}, unif(gen));
+//     }
+//   }
+//   D.pack();
 
   // Declare the output matrix to be a sparse matrix with the same dimensions as
   // input matrix B, to be also stored as a doubly compressed sparse row matrix.
-  Tensor<int32_t> A(B.getDimensions(), dcsr);
+  Tensor<int> A({4}, rm);
 
   // Define the SDDMM computation using index notation.
-  IndexVar i, j, k;
-  A(i,j) = B(i,j) * C(i,k) * D(k,j);
+  IndexVar i;
+  A(i) = B(i) + C(i);
+
+  // IndexVar i, j, k;
+  // A(i,j) = B(i,k) * C(k,j);
+
+  // Tensor<double> D({2,2}, rm);
+  // D(i,j) = A(i,j) + B(i,j);
 
   // At this point, we have defined how entries in the output matrix should be
   // computed from entries in the input matrices but have not actually performed
   // the computation yet. To do so, we must first tell taco to generate code that
   // can be executed to compute the SDDMM operation.
+
+
+  // A.parallelize(i,CPUVector);
+
   A.compile(true);
+  std::cout << "done compiling" << std::endl;
+
+  // std::string path = A.emitHydride();
+  // std::cout << "emitted hydride @ " << path << std::endl;
+
+  // std::cout << A.getSource() << std::endl;
+
+
   // We can now call the functions taco generated to assemble the indices of the
   // output matrix and then actually compute the SDDMM.
   A.assemble();
+  std::cout << "done assembling" << std::endl;
+
   A.compute();
+  std::cout << "done computing" << std::endl;
+
+
   // Write the output of the computation to file (stored in the Matrix Market format).
-  write("A.mtx", A);
+  // write("A.mtx", A);
 }

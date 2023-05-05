@@ -17,76 +17,11 @@ Stmt optimize_instructions_synthesis(Stmt);
  * High-level Overview of TACO IR
  * 
  * enum IRNodeType {
- *   Literal,
- *   Var,
- *   Neg,
- *   Sqrt,
- *   Add,
- *   Sub,
- *   Mul,
- *   Div,
- *   Rem,
- *   Min,
- *   Max,
- *   BitAnd,
- *   BitOr,
- *   Not,
- *   Eq,
- *   Neq,
- *   Gt,
- *   Lt,
- *   Gte,
- *   Lte,
- *   And,
- *   Or,
- *   BinOp,
- *   Cast,
- *   Call,
- *   IfThenElse,
- *   Case,
- *   Switch,
- *   Load,
- *   Malloc,
- *   Sizeof,
- *   Store,
- *   For,
- *   While,
- *   Block,
- *   Scope,
- *   Function,
- *   VarDecl,
- *   VarAssign,
- *   Yield,
- *   Allocate,
- *   Free,
- *   Comment,
- *   BlankLine,
- *   Print,
- *   GetProperty,
- *   Continue,
- *   Sort,
- *   Break
- * };
- * 
- * enum TensorProperty {
- *   Order,
- *   Dimension,
- *   ComponentSize,
- *   ModeOrdering,
- *   ModeTypes,
- *   Indices,
- *   Values,
- *   FillValue,
- *   ValuesSize
- * };
- * 
- * enum LoopKind {
- *   Serial, 
- *   Static, 
- *   Dynamic, 
- *   Runtime, 
- *   Vectorized, 
- *   Static_Chunked
+ *   Literal, Var, Neg, Sqrt, Add, Sub, Mul, Div, Rem, Min, Max, BitAnd, BitOr, 
+ *   Not, Eq, Neq, Gt, Lt, Gte, Lte, And, Or, BinOp, Cast, Call, IfThenElse,
+ *   Case, Switch, Load, Malloc, Sizeof, Store, For, While, Block, Scope, 
+ *   Function, VarDecl, VarAssign, Yield, Allocate, Free, Comment, BlankLine, 
+ *   Print, GetProperty, Continue, Sort, Break
  * };
  * 
  * // Base class for backend IR
@@ -174,6 +109,8 @@ Stmt optimize_instructions_synthesis(Stmt);
  *       GetProperty  // A tensor property, This unpacks one of the properties of a tensor into an Expr.
  *         Expr tensor;
  *         TensorProperty property;
+ *           { Order, Dimension, ComponentSize, ModeOrdering, 
+ *             ModeTypes, Indices, Values, FillValue, ValuesSize };
  *         int mode;
  *         int index = 0;
  *         string name;
@@ -206,7 +143,7 @@ Stmt optimize_instructions_synthesis(Stmt);
  *         Expr increment;
  *         Stmt contents;
  *         LoopKind kind;
- *           {Serial, Static, Dynamic, Runtime, Vectorized, Static_Chunked}
+ *           { Serial, Static, Dynamic, Runtime, Vectorized, Static_Chunked }
  *         int vec_width;  // vectorization width
  *         ParallelUnit parallel_unit;
  *         size_t unrollFactor;
@@ -214,7 +151,7 @@ Stmt optimize_instructions_synthesis(Stmt);
  *         Expr cond;
  *         Stmt contents;
  *         LoopKind kind;
- *           {Serial, Static, Dynamic, Runtime, Vectorized, Static_Chunked}
+ *           { Serial, Static, Dynamic, Runtime, Vectorized, Static_Chunked }
  *         int vec_width;  // vectorization width
  *       Function  // Top-level function for codegen
  *         string name;

@@ -617,6 +617,8 @@ struct Switch : public StmtNode<Switch> {
 
 enum class LoopKind {Serial, Static, Dynamic, Runtime, Vectorized, Static_Chunked};
 
+std::ostream& operator<<(std::ostream& out, const LoopKind kind);
+
 /** A for loop from start to end by increment.
  * A vectorized loop will require the increment to be 1 and the
  * end to be (start + Literal) or possibly (start + Var).
