@@ -47,11 +47,13 @@ class HydrideEmitter : public IRVisitor {
     emit_set_memory_limit(20000);
     stream << std::endl;
 
-    emit_expr(op);
-    stream << std::endl;
+    LoadVarMapVisitor(loadToRegMap, varToRegMap).visit(op);
     emit_symbolic_buffers();
     stream << std::endl;
     emit_buffer_id_map();
+    stream << std::endl;
+
+    emit_expr(op);
     stream << std::endl;
 
     emit_hydride_synthesis(/* expr_depth */ 3, /* VF */ vector_width);
@@ -73,6 +75,37 @@ class HydrideEmitter : public IRVisitor {
 
   std::map<Expr, std::string, ExprCompare> varMap;
   std::vector<Expr> localVars;
+
+  class LoadVarMapVisitor : public IRVisitor {
+   public:
+    LoadVarMapVisitor(std::map<const Load*, uint>& loadToRegMap, std::map<const Var*, uint>& varToRegMap) 
+                    : loadToRegMap(loadToRegMap), varToRegMap(varToRegMap) {}
+
+    void visit(const Expr* op) { op->accept(this); }
+
+   protected:
+    using IRVisitor::visit;
+
+    // map from taco load instructions to racket registers
+    std::map<const Load*, uint>& loadToRegMap;
+
+    // map from taco variables to racket registers
+    std::map<const Var*, uint>& varToRegMap;
+
+    void visit(const Var* op) override {
+      if (varToRegMap.find(op) == varToRegMap.end()) {
+        size_t reg_counter = varToRegMap.size() + loadToRegMap.size();
+        varToRegMap[op] = reg_counter;
+      }
+    }
+
+    void visit(const Load* op) override {
+      if (loadToRegMap.find(op) == loadToRegMap.end()) {
+        size_t reg_counter = varToRegMap.size() + loadToRegMap.size();
+        loadToRegMap[op] = reg_counter;
+      }
+    }
+  };
 
   void emit_racket_imports() {
     stream << "#lang rosette" << std::endl
@@ -249,13 +282,10 @@ class HydrideEmitter : public IRVisitor {
 
     stream << "(xBroadcast ";  // broadcast var to vector width
 
-    if (varToRegMap.find(op) != varToRegMap.end()) {
+    if (varToRegMap.find(op) != varToRegMap.end())
       stream << "reg_" << varToRegMap[op];
-    } else {
-      size_t reg_counter = varToRegMap.size() + loadToRegMap.size();
-      varToRegMap[op] = reg_counter;
-      stream << "reg_" << reg_counter;
-    }
+    else
+      taco_ierror << "Var node not found in varToRegMap.";
 
     stream << " " << vector_width << ")";
   }
@@ -397,13 +427,10 @@ class HydrideEmitter : public IRVisitor {
       stream << "(xBroadcast ";  // broadcast op to vector width
     }
 
-    if (loadToRegMap.find(op) != loadToRegMap.end()) {
+    if (loadToRegMap.find(op) != loadToRegMap.end())
       stream << "reg_" << loadToRegMap[op];
-    } else {
-      size_t reg_counter = varToRegMap.size() + loadToRegMap.size();
-      loadToRegMap[op] = reg_counter;
-      stream << "reg_" << reg_counter;
-    }
+    else
+      taco_ierror << "Load node not found in loadToRegMap.";
 
     if (op->vectorized) {
       stream << " " << vector_width << ")";
