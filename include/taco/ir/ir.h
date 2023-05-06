@@ -511,6 +511,7 @@ struct Call : public ExprNode<Call> {
 struct Load : public ExprNode<Load> {
   Expr arr;
   Expr loc;
+  bool vectorized;  // Used to store vectorization info when outputting rosette.
 
   static Expr make(Expr arr);
   static Expr make(Expr arr, Expr loc);
@@ -577,6 +578,7 @@ struct Store : public StmtNode<Store> {
   Expr data;
   bool use_atomics;
   ParallelUnit atomic_parallel_unit;
+  bool vectorized;  // Used to store vectorization info when outputting rosette.
 
   static Stmt make(Expr arr, Expr loc, Expr data, bool use_atomics=false, ParallelUnit atomic_parallel_unit=ParallelUnit::NotParallel);
 

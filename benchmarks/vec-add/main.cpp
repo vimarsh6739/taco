@@ -52,6 +52,11 @@ int main(int argc, char* argv[]) {
   IndexVar i;
   A(i) = B(i) + C(i);
 
+  // IndexVar i0;
+  // IndexVar i1;
+  // split(i, i0, i1, 32);
+  // A.unroll(i0, 4)
+
   // IndexVar i, j, k;
   // A(i,j) = B(i,k) * C(k,j);
 

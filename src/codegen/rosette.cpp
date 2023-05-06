@@ -26,10 +26,17 @@ class HydrideEmitter : public IRVisitor {
   // This is done in Rosette syntax.
 
  public:
+  // map from taco load instructions to racket registers
+  std::map<const Load*, uint> loadToRegMap;
+
+  // map from taco variables to racket registers
+  std::map<const Var*, uint> varToRegMap;
+
   HydrideEmitter(std::ostream& stream) : stream(stream) {};
 
   void translate(const Expr* op, std::string benchmark_name, size_t expr_id, size_t vector_width) {
     bitwidth = 512;
+    this->vector_width = vector_width;
 
     emit_racket_imports();
     stream << std::endl;
@@ -40,13 +47,13 @@ class HydrideEmitter : public IRVisitor {
     emit_set_memory_limit(20000);
     stream << std::endl;
 
+    emit_expr(op);
+    stream << std::endl;
     emit_symbolic_buffers();
     stream << std::endl;
     emit_buffer_id_map();
     stream << std::endl;
 
-    emit_expr(op);
-    stream << std::endl;
     emit_hydride_synthesis(/* expr_depth */ 3, /* VF */ vector_width);
     stream << std::endl;
     emit_compile_to_llvm(benchmark_name, expr_id);
@@ -62,15 +69,10 @@ class HydrideEmitter : public IRVisitor {
   std::string benchmark_name;
   size_t expr_count;
   size_t bitwidth;
+  size_t vector_width = 1;  // Vector width of the current expression.
 
   std::map<Expr, std::string, ExprCompare> varMap;
   std::vector<Expr> localVars;
-
-  // map from taco load instructions to racket registers
-  std::map<const Load*, uint> loadToRegMap;
-
-  // map from taco variables to racket registers
-  std::map<const Var*, uint> varToRegMap;
 
   void emit_racket_imports() {
     stream << "#lang rosette" << std::endl
@@ -93,7 +95,7 @@ class HydrideEmitter : public IRVisitor {
   }
 
   void emit_set_memory_limit(size_t mb) {
-    stream << "(custodian-limit-memory (current-custodian) (* " << mb << " 1024 1024))";
+    stream << "(custodian-limit-memory (current-custodian) (* " << mb << " 1024 1024))" << std::endl;
   }
 
   void emit_symbolic_buffer(uint reg_num, Datatype type) {
@@ -111,11 +113,11 @@ class HydrideEmitter : public IRVisitor {
     if (type.isFloat()) {
       switch (bits) {
         case 32:
-          stream << "float";
+          stream << "float"; break;
         case 64:
-          stream << "double";  
+          stream << "double"; break;
         default:
-          stream << "float" << bits;
+          stream << "float" << bits; break;
       }
     }
     
@@ -193,9 +195,11 @@ class HydrideEmitter : public IRVisitor {
   }
 
   void visit(const Literal* op) {
+    stream << "(xBroadcast ";  // broadcast op to vector width
+
     switch (op->type.getKind()) {
       case Datatype::Bool: {
-        stream << "(<literal> " << op->type << " " << op->getValue<bool>() << ")"; break;
+        stream << "(int-imm (bv " << static_cast<uint16_t>(op->getValue<bool>()) << " 2) #f)";
       } break;
       case Datatype::UInt8: {
         stream << "(int-imm (bv " << static_cast<uint16_t>(op->getValue<uint8_t>()) << " 8) #f)";
@@ -224,24 +228,26 @@ class HydrideEmitter : public IRVisitor {
         stream << "(int-imm (bv " << op->getValue<int64_t>() << " 64) #t)";
       } break;
       case Datatype::Int128: 
-        taco_not_supported_yet; break;
+        taco_ierror << "No support for int128_t types"; break;
       case Datatype::Float32:
-        stream << "(<literal> " << op->type << " " << ((op->getValue<float>() != 0.0) ? util::toString(op->getValue<float>()) : "0.0") << ")"; break;
+        taco_ierror << "No support for float types"; break;
       case Datatype::Float64:
-        stream << "(<literal> " << op->type << " " << ((op->getValue<double>()!=0.0) ? util::toString(op->getValue<double>()) : "0.0") << ")"; break;
+        taco_ierror << "No support for float types"; break;
       case Datatype::Complex64:
       case Datatype::Complex128:
         taco_ierror << "No support for complex numbers"; break;
       case Datatype::Undefined:
         taco_ierror << "Undefined type in IR"; break;
     }
+
+    stream << " " << vector_width << ")";
   }
 
   void visit(const Var* op) {
-    // if op is skipnode, emit nothing
-
     // For Vars, we replace their names with the generated name, since we match by reference (not name)
     // taco_iassert(varMap.count(op) > 0) << "Var " << op->name << " not found in varMap";
+
+    stream << "(xBroadcast ";  // broadcast var to vector width
 
     if (varToRegMap.find(op) != varToRegMap.end()) {
       stream << "reg_" << varToRegMap[op];
@@ -250,6 +256,8 @@ class HydrideEmitter : public IRVisitor {
       varToRegMap[op] = reg_counter;
       stream << "reg_" << reg_counter;
     }
+
+    stream << " " << vector_width << ")";
   }
 
   void visit(const Neg* op) {
@@ -385,33 +393,33 @@ class HydrideEmitter : public IRVisitor {
   }
 
   void visit(const Load* op) {
-    // insert skipnodes for predicate and index???
-    
+    if (op->vectorized) {
+      stream << "(xBroadcast ";  // broadcast op to vector width
+    }
 
-    stream << "(<load> ";
-    op->arr.accept(this);
-    stream << " ";
-    op->loc.accept(this);
-    stream << ")";
+    if (loadToRegMap.find(op) != loadToRegMap.end()) {
+      stream << "reg_" << loadToRegMap[op];
+    } else {
+      size_t reg_counter = varToRegMap.size() + loadToRegMap.size();
+      loadToRegMap[op] = reg_counter;
+      stream << "reg_" << reg_counter;
+    }
+
+    if (op->vectorized) {
+      stream << " " << vector_width << ")";
+    }
   }
 
   void visit(const Malloc* op) {
-    stream << "(<malloc> ";
-    op->size.accept(this);
-    stream << ")";
+    taco_ierror << "Malloc node not supported in hydride translation.";
   }
 
   void visit(const Sizeof* op) {
-    stream << "(<sizeof> ";
-    stream << op->sizeofType;
-    stream << ")";
+    taco_ierror << "Sizeof node not supported in hydride translation.";
   }
 
   void visit(const GetProperty* op) {
-    stream << "(<prop> ";
-    // taco_iassert(varMap.count(op) > 0) << "Property " << Expr(op) << " of " << op->tensor << " not found in varMap";
-    // stream << varMap[op];
-    stream << ")";
+    taco_ierror << "GetProperty node not supported in hydride translation.";
   }
 };
 
@@ -500,8 +508,6 @@ class ExprOptimizer : public IRRewriter {
 
   // Helper function for all valid expressions
   Expr synthExpr(Expr op) {
-    std::cout << "<אקספר>" << op << std::endl;
-
     /** 
      * Mutation steps:
      * 
@@ -510,17 +516,35 @@ class ExprOptimizer : public IRRewriter {
      * Ignore some qualifying but trivial expressions to reduce noise in the results
      */
 
+    // 1. Generate the hydride expression and write to a racket file.
     std::string benchmark_name = "hydride";
     size_t expr_id = expr_count++;
     std::string file_name = "taco_expr_" + benchmark_name + "_" + std::to_string(expr_id) + ".rkt";
 
     std::ofstream ostream;
     ostream.open(file_name);
-    HydrideEmitter(ostream).translate(&op, benchmark_name, expr_id, /* vector_width */ 1);
+    HydrideEmitter hydride_emitter(ostream);
+    // todo: calculate vector width
+    hydride_emitter.translate(&op, benchmark_name, expr_id, /* vector_width */ 4);
     ostream.close();
     std::cout << "Wrote racket code to file @ " << file_name << std::endl;
 
-    return op;
+    // 2. Actually synthesize the expression with Hydride.
+
+
+    // 3. Replace the expression with an external llvm function call.
+    std::string function_name = "hydride_node_" + benchmark_name + "_" + std::to_string(expr_id);
+    std::vector<Expr> args(hydride_emitter.loadToRegMap.size() + hydride_emitter.varToRegMap.size());
+    
+    for (const auto& item : hydride_emitter.loadToRegMap) {
+      args[item.second] = item.first;
+    }
+
+    for (const auto& item : hydride_emitter.varToRegMap) {
+      args[item.second] = item.first;
+    }
+
+    return Call::make(function_name, args, op.type());
   }
 
   void visit(const Neg* op) override {
@@ -662,37 +686,24 @@ class LoopOptimizer : public IRRewriter {
     
     // Check if the loop is vectorizable??? todo: implement
     IRPrinter(std::cout).print(op->contents);
-    expr_optimizer.rewrite(op->contents);
+    stmt = For::make(op->var, op->start, op->end, op->increment, 
+                     expr_optimizer.rewrite(op->contents),
+                     op->kind, op->parallel_unit, op->unrollFactor, op->vec_width);
   }
 };
 
 
-
 } // anonymous namespace
-
-// ORIGINAL METHOD:
-// void CodeGen_Hydride::compile(Stmt stmt, bool isFirst) {
-//   // varMap = {};
-//   // localVars = {};
-//   // out << endl;
-//   // // generate code for the Stmt
-//   // stmt.accept(this);
-
-// }
 
 Stmt optimize_instructions_synthesis(Stmt stmt) {
   std::cout << "ס" << std::endl;
   IRPrinter printer(std::cout);
 
-  // stmt = LoadRewriter().rewrite(stmt);
-  // stmt = IROptimizer().rewrite(stmt);
+  // Run the optimizer that targets the innermost vectorizable loop.
+  stmt = LoopOptimizer().rewrite(stmt);
 
-  LoopOptimizer().rewrite(stmt);
   return stmt;
 
-  // IROptimizer().rewrite(stmt);
-
-  // IROptimizer().rewrite()
     // find all expressions we want to synth
     // output rosette code for each
     // replace with external function call .ll

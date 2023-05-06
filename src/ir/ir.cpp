@@ -524,6 +524,7 @@ Expr Load::make(Expr arr, Expr loc) {
   load->type = arr.type();
   load->arr = arr;
   load->loc = loc;
+  load->vectorized = true;
   return load;
 }
 
@@ -608,6 +609,7 @@ Stmt Store::make(Expr arr, Expr loc, Expr data, bool use_atomics, ParallelUnit a
   store->data = data;
   store->use_atomics = use_atomics;
   store->atomic_parallel_unit = atomic_parallel_unit;
+  store->vectorized = false;
   return store;
 }
 
