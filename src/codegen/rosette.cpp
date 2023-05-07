@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <unordered_set>
 #include <taco.h>
+#include <chrono>
 
 #include "taco/ir/ir_printer.h"
 #include "taco/ir/ir_visitor.h"
@@ -450,78 +451,6 @@ class HydrideEmitter : public IRVisitor {
   }
 };
 
-class LoadRewriter : public IRRewriter {
-  // store vector of temp variables to load expressions
-  uint tempVarCount = 0;
-  vector<pair<string, const Expr>> decls;
-
- protected:
-    using IRRewriter::visit;
-
-  void visit(const Load* op) override {
-    IRRewriter::visit(op);
-    string varName = "temp_load_" + std::to_string(tempVarCount++);
-    decls.emplace_back(varName, expr);
-    std::cout << "HI: " << expr << std::endl;
-    expr = Var::make(varName, expr.type());
-    std::cout << "HI: " << expr << std::endl;
-  }
-
-  void visit(const Store* op) override {
-    IRRewriter::visit(op);
-    insertDecls();
-  }
-  
-  void visit(const IfThenElse* op) override {
-    IRRewriter::visit(op);
-    insertDecls();
-  }
-
-  void visit(const Switch* op) override {
-    IRRewriter::visit(op);
-    insertDecls();
-  }
-
-  void visit(const For* op) override {
-    IRRewriter::visit(op);
-    insertDecls();
-  }
-
-  void visit(const While* op) override {
-    IRRewriter::visit(op);
-    insertDecls();
-  }
-
-  void visit(const Assign* op) override {
-    IRRewriter::visit(op);
-    insertDecls();
-  }
-
-  void visit(const Yield* op) override {
-    IRRewriter::visit(op);
-    insertDecls();
-  }
-
-  void visit(const Print* op) override {
-    IRRewriter::visit(op);
-    insertDecls();
-  }
-
- private:
-  void insertDecls() {
-    if (decls.size() > 0) {
-      vector<Stmt> stmts;
-      for (const auto& decl: decls) {
-        stmts.push_back(VarDecl::make(Var::make(decl.first, decl.second.type()), decl.second));
-      }
-      stmts.push_back(stmt);
-      stmt = Scope::make(Block::make(stmts));
-      decls.clear();
-    }
-  }
-
-};
-
 class ExprOptimizer : public IRRewriter {
   // Visits a Taco loop body and optimizes each expression.
 
@@ -557,7 +486,13 @@ class ExprOptimizer : public IRRewriter {
     std::cout << "Wrote racket code to file @ " << file_name << std::endl;
 
     // 2. Actually synthesize the expression with Hydride.
+    std::string cmd = "racket " + file_name;
 
+    auto start = std::chrono::system_clock::now();
+    int ret_code = system(cmd.c_str());
+    auto end = std::chrono::system_clock::now();
+    taco_iassert(ret_code == 0) << "Synthesis crashed, exiting ...";
+    std::cout << "Synthesis took " << (end - start).count() << "seconds ..." << "\n";
 
     // 3. Replace the expression with an external llvm function call.
     std::string function_name = "hydride_node_" + benchmark_name + "_" + std::to_string(expr_id);
@@ -574,129 +509,48 @@ class ExprOptimizer : public IRRewriter {
     return Call::make(function_name, args, op.type());
   }
 
-  void visit(const Neg* op) override {
-    std::cout << "<Neg>";
-    expr = synthExpr(op);
-  }
+  void visit(const Neg* op) override { expr = synthExpr(op); }
   
-  void visit(const Sqrt* op) override {
-    std::cout << "<Sqrt>";
-    expr = synthExpr(op);
-  }
+  void visit(const Sqrt* op) override { expr = synthExpr(op); }
   
-  void visit(const Add* op) override {
-    std::cout << "<Add>";
-    expr = synthExpr(op);
-  }
+  void visit(const Add* op) override { expr = synthExpr(op); }
   
-  void visit(const Sub* op) override {
-    std::cout << "<Sub>";
-    expr = synthExpr(op);
-  }
+  void visit(const Sub* op) override { expr = synthExpr(op); }
   
-  void visit(const Mul* op) override {
-    std::cout << "<Mul>";
-    expr = synthExpr(op);
-  }
+  void visit(const Mul* op) override { expr = synthExpr(op); }
   
-  void visit(const Div* op) override {
-    std::cout << "<Div>";
-    expr = synthExpr(op);
-  }
+  void visit(const Div* op) override { expr = synthExpr(op); }
   
-  void visit(const Rem* op) override {
-    std::cout << "<Rem>";
-    expr = synthExpr(op);
-  }
+  void visit(const Rem* op) override { expr = synthExpr(op); }
   
-  void visit(const Min* op) override {
-    std::cout << "<Min>";
-    expr = synthExpr(op);
-  }
+  void visit(const Min* op) override { expr = synthExpr(op); }
   
-  void visit(const Max* op) override {
-    std::cout << "<Max>";
-    expr = synthExpr(op);
-  }
+  void visit(const Max* op) override { expr = synthExpr(op); }
   
-  void visit(const BitAnd* op) override {
-    std::cout << "<BitAnd>";
-    expr = synthExpr(op);
-  }
+  void visit(const BitAnd* op) override { expr = synthExpr(op); }
   
-  void visit(const BitOr* op) override {
-    std::cout << "<BitOr>";
-    expr = synthExpr(op);
-  }
+  void visit(const BitOr* op) override { expr = synthExpr(op); }
   
-  void visit(const Eq* op) override {
-    std::cout << "<Eq>";
-    expr = synthExpr(op);
-  }
+  void visit(const Eq* op) override { expr = synthExpr(op); }
   
-  void visit(const Neq* op) override {
-    std::cout << "<Neq>";
-    expr = synthExpr(op);
-  }
+  void visit(const Neq* op) override { expr = synthExpr(op); }
   
-  void visit(const Gt* op) override {
-    std::cout << "<אקספר>";
-    expr = synthExpr(op);
-  }
+  void visit(const Gt* op) override { expr = synthExpr(op); }
   
-  void visit(const Lt* op) override {
-    std::cout << "<Lt>";
-    expr = synthExpr(op);
-  }
+  void visit(const Lt* op) override { expr = synthExpr(op); }
   
-  void visit(const Gte* op) override {
-    std::cout << "<Gte>";
-    expr = synthExpr(op);
-  }
+  void visit(const Gte* op) override { expr = synthExpr(op); }
   
-  void visit(const Lte* op) override {
-    std::cout << "<Lte>";
-    expr = synthExpr(op);
-  }
+  void visit(const Lte* op) override { expr = synthExpr(op); }
   
-  void visit(const And* op) override {
-    std::cout << "<And>";
-    expr = synthExpr(op);
-  }
+  void visit(const And* op) override { expr = synthExpr(op); }
   
-  void visit(const Or* op) override {
-    std::cout << "<Or>";
-    expr = synthExpr(op);
-  }
+  void visit(const Or* op) override { expr = synthExpr(op); }
   
-  void visit(const BinOp* op) override {
-    std::cout << "<BinOp>";
-    expr = synthExpr(op);
-  }
+  void visit(const BinOp* op) override { expr = synthExpr(op); }
   
-  void visit(const Cast* op) override {
-    std::cout << "<Cast>";
-    expr = synthExpr(op);
-  }
+  void visit(const Cast* op) override { expr = synthExpr(op); }
 
-};
-
-class LoopDetector : public IRVisitor {
-  // Visits a Taco IR for loop and returns whether there is a inner loop.
- public:
-  LoopDetector() : found(false) {};
-
-  bool visit(const Stmt& op) {
-    op.accept(this);
-    return found;
-  }
-
- protected:
-  using IRVisitor::visit;
-  bool found;
-
-  void visit(const For* op) { found = true; }
-  void visit(const While* op) { found = true; }
 };
 
 class LoopOptimizer : public IRRewriter {
@@ -705,20 +559,48 @@ class LoopOptimizer : public IRRewriter {
  protected:
   using IRRewriter::visit;
   ExprOptimizer expr_optimizer;
+  size_t in_vectorizable_loop;
+
+  class LoopDetector : public IRVisitor {
+    // Visits a Taco IR for loop and returns whether there is a inner loop.
+   public:
+    LoopDetector() : found(false) {};
+
+    bool visit(const Stmt& op) {
+      op.accept(this);
+      return found;
+    }
+
+   protected:
+    using IRVisitor::visit;
+    bool found;
+
+    void visit(const For* op) { found = true; }
+    void visit(const While* op) { found = true; }
+  };
+
+  LoopDetector loop_detector;
 
   void visit(const For* op) {
     // If this is not the innermost loop, keep traversing
-    if (LoopDetector().visit(op->contents))
+    if (loop_detector.visit(op->contents))
       return IRRewriter::visit(op);
-    
+
     // Check if the loop is vectorizable??? todo: implement
-    IRPrinter(std::cout).print(op->contents);
-    stmt = For::make(op->var, op->start, op->end, op->increment, 
-                     expr_optimizer.rewrite(op->contents),
-                     op->kind, op->parallel_unit, op->unrollFactor, op->vec_width);
+    in_vectorizable_loop++;
+    IRRewriter::visit(op);
+    // Rewrite the for loop bounds if necessary
+    in_vectorizable_loop--;
+  }
+
+  void visit(const Store* op) {
+    if (!in_vectorizable_loop)
+      return IRRewriter::visit(op);
+
+    stmt = Store::make(op->arr, op->loc, expr_optimizer.rewrite(op->data), 
+                       op->use_atomics, op->atomic_parallel_unit);
   }
 };
-
 
 } // anonymous namespace
 

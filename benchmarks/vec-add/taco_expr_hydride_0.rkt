@@ -13,12 +13,6 @@
 (current-bitwidth 512)
 (custodian-limit-memory (current-custodian) (* 20000 1024 1024))
 
-(define halide-expr 
-	(vec-add (xBroadcast reg_0 4) (xBroadcast reg_1 4))
-)
-
-(clear-vc!)
-
 (define reg_0_bitvector (bv 0 (bitvector 512)))
 (define reg_0 (halide:create-buffer reg_0_bitvector 'int32))
 (define reg_1_bitvector (bv 0 (bitvector 512)))
@@ -28,6 +22,12 @@
 (define id-map (make-hash))
 (hash-set! id-map reg_0 (bv 0 (bitvector 8)))
 (hash-set! id-map reg_1 (bv 1 (bitvector 8)))
+
+(define halide-expr 
+	(vec-add (xBroadcast reg_0 4) (xBroadcast reg_1 4))
+)
+
+(clear-vc!)
 
 (define synth-res (synthesize-halide-expr halide-expr id-map 3 4 'z3 #t #f "" "" "x86"))
 (dump-synth-res-with-typeinfo synth-res id-map)

@@ -10,9 +10,7 @@
 namespace taco {
 namespace ir {
 
-
-void hydride_generate_llvm_bitcode(Target::Arch t, std::string input_file, std::string output_file, std::string benchmark_name);
-
+void hydride_generate_llvm_bitcode(std::string input_file, std::string output_file, std::string benchmark_name);
 
 } // namespace ir
 } // namespace taco

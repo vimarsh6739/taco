@@ -1,5 +1,7 @@
 #include "rosette.h"
 
+#include <chrono>
+
 using namespace std;
 
 namespace taco {
@@ -36,8 +38,9 @@ void hydride_generate_llvm_bitcode(std::string input_file, std::string output_fi
     // TEMP CMD
     std::string temp_cmd = "cp /tmp/" + benchmark_name + ".ll.legalize.ll " + output_file;
     ret_code = system(temp_cmd.c_str());
-    internal_assert(ret_code == 0) << "Copying crashed, exiting ...";
+    taco_iassert(ret_code == 0) << "Copying crashed, exiting ...";
 
 }
 
+}
 }
