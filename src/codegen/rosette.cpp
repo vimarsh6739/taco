@@ -454,7 +454,7 @@ class ExprOptimizer : public IRRewriter {
     // todo: calculate vector width
     hydride_emitter.translate(&op, benchmark_name, expr_id, vector_width);
     ostream.close();
-    std::cout << "Wrote racket code to file @ " << file_name << std::endl;
+    std::cout << "Writing racket code to file: " << file_name << std::endl;
 
     // 2. Actually synthesize the expression with Hydride.
     std::string cmd = "racket " + file_name;
@@ -598,8 +598,9 @@ class LoopOptimizer : public IRRewriter {
     Expr increment = rewrite(op->increment);
 
     Stmt contents = rewrite(PopulateVectorWidths(op->vec_width).rewrite(op->contents));
-    stmt = For::make(var, start, end, increment, contents, op->kind,
-                     op->parallel_unit, op->unrollFactor, op->vec_width);
+    stmt = For::make(var, start, end, (op->vec_width > 1) ? 
+                        Literal::make(increment.as<Literal>()->getIntValue() * op->vec_width, increment.type()) : increment,
+                     contents, op->kind, op->parallel_unit, op->unrollFactor, op->vec_width);
 
     expr_optimizer.vector_width = 1;
     in_vectorizable_loop--;
@@ -619,8 +620,6 @@ class LoopOptimizer : public IRRewriter {
 
 
 Stmt optimize_instructions_synthesis(Stmt stmt) {
-  std::cout << "ס" << std::endl;
-
   std::string benchmark_name = "tydride";
   bool mutated_expr;
 

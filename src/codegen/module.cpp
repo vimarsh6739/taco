@@ -41,7 +41,7 @@ void Module::addFunction(Stmt func) {
 }
 
 void Module::compileToSource(string path, string prefix, bool emitHydride) {
-  std::cout << "Writing generated C file to:" << path << "" << prefix << ".c" << std::endl;
+  std::cout << "Writing generated C file to: " << path << "" << prefix << ".c" << std::endl;
   if (emitHydride){
 
     if (!moduleFromUserSource) {
@@ -193,19 +193,24 @@ string Module::compile(bool emitHydride) {
   string cmd;
   int err;
   if (emitHydride) {
-    cmd = "clang -g -O0 -std=c99 -S -emit-llvm " + prefix + ".c -o " + prefix + ".ll";
-    err = system(cmd.data());
-    taco_uassert(err == 0) << "Compilation command failed:" << std::endl << cmd << std::endl << "returned " << err;
+    // cmd = "clang -g -O0 -std=c99 -S -emit-llvm " + prefix + ".c -o " + prefix + ".ll";
+    // err = system(cmd.data());
+    // taco_uassert(err == 0) << "Compilation command failed:" << std::endl << cmd << std::endl << "returned " << err;
 
-    cmd = "llvm-link -S " + prefix + ".ll bin/llvm_shim_tydride.ll bin/tydride.ll.legalize.ll > " + prefix + "_linked.ll";
-    err = system(cmd.data());
-    taco_uassert(err == 0) << "Linking command failed:" << std::endl << cmd << std::endl << "returned " << err;
+    // cmd = "llvm-link -S " + prefix + ".ll bin/llvm_shim_tydride.ll bin/tydride.ll.legalize.ll > " + prefix + "_linked.ll";
+    // err = system(cmd.data());
+    // taco_uassert(err == 0) << "Linking command failed:" << std::endl << cmd << std::endl << "returned " << err;
 
     // cmd = "opt -O3 --always-inline -S " + prefix + "_linked.ll > " + prefix + "_linked_opt.ll";
     // err = system(cmd.data());
     // taco_uassert(err == 0) << "Inlining command failed:" << std::endl << cmd << std::endl << "returned " << err;
 
-    cmd = "clang -shared -fPIC " + prefix + "_linked_opt.ll -o " + fullpath + " -lm";
+    // cmd = "clang -shared -fPIC " + prefix + "_linked_opt.ll -o " + fullpath + " -lm";
+    // err = system(cmd.data());
+    // taco_uassert(err == 0) << "Compilation command failed:" << std::endl << cmd << std::endl << "returned " << err;
+    
+    std::cout << "Beginning hydride emission" << std::endl;
+    cmd = "clang -g -O0 -std=c99 -shared -fPIC " + prefix + ".c bin/llvm_shim_tydride.ll bin/tydride.ll.legalize.ll -o " + fullpath + " -lm";
     err = system(cmd.data());
     taco_uassert(err == 0) << "Compilation command failed:" << std::endl << cmd << std::endl << "returned " << err;
 

@@ -91,5 +91,5 @@ int main(int argc, char* argv[]) {
 
 
   // Write the output of the computation to file (stored in the Matrix Market format).
-  // write("A.mtx", A);
+  write("A.ttx", A);
 }

@@ -143,7 +143,7 @@ void hydride_generate_llvm_shim(const Stmt* stmt, std::string output_file) {
   LLVMShimEmitter(ostream, output_file).visit(stmt);
   ostream.close();
 
-  std::cout << "Wrote llvm shim to file @ " << output_file << std::endl;
+  std::cout << "Writing llvm shim to file: " << output_file << std::endl;
 }
 
 
@@ -180,7 +180,7 @@ void hydride_generate_llvm_bitcode(std::string input_file, std::string output_fi
     ret_code = system(temp_cmd.c_str());
     taco_iassert(ret_code == 0) << "Copying crashed, exiting ...";
 
-    std::cout << "Wrote lifted llvm to file @ " << output_file << std::endl;
+    std::cout << "Writing lifted llvm to file: " << output_file << std::endl;
 }
 
 
