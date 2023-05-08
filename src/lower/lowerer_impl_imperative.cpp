@@ -1227,7 +1227,9 @@ Stmt LowererImplImperative::lowerForallDimension(Forall forall,
 
   return Block::blanks(For::make(coordinate, bounds[0], bounds[1], 1, body,
                                  kind,
-                                 ignoreVectorize ? ParallelUnit::NotParallel : forall.getParallelUnit(), ignoreVectorize ? 0 : forall.getUnrollFactor()),
+                                 ignoreVectorize ? ParallelUnit::NotParallel : forall.getParallelUnit(), 
+                                 ignoreVectorize ? 0 : forall.getUnrollFactor(), 
+                                 (kind==LoopKind::Vectorized) * 4),
                        posAppend);
 }
 
@@ -1286,7 +1288,8 @@ Stmt LowererImplImperative::lowerForallDimension(Forall forall,
 
     return Block::blanks(For::make(loopVar, 0, indexListSize, 1, body, kind,
                                          ignoreVectorize ? ParallelUnit::NotParallel : forall.getParallelUnit(),
-                                         ignoreVectorize ? 0 : forall.getUnrollFactor()),
+                                         ignoreVectorize ? 0 : forall.getUnrollFactor(), 
+                                         (kind==LoopKind::Vectorized) * 4),
                                          posAppend);
   }
 
@@ -1408,7 +1411,7 @@ Stmt LowererImplImperative::lowerForallPosition(Forall forall, Iterator iterator
 
     loop = For::make(iterator.getPosVar(), startBound, endBound, 1, loop, kind,
                      ignoreVectorize ? ParallelUnit::NotParallel : forall.getParallelUnit(), 
-		     ignoreVectorize ? 0 : forall.getUnrollFactor());
+		     ignoreVectorize ? 0 : forall.getUnrollFactor(), (kind==LoopKind::Vectorized) * 4);
   }
 
   // Loop with preamble and postamble
@@ -1575,7 +1578,9 @@ Stmt LowererImplImperative::lowerForallFusedPosition(Forall forall, Iterator ite
                        For::make(indexVarToExprMap[iterator.getIndexVar()], startBound, endBound, 1,
                                  Block::make(declareCoordinate, body),
                                  kind,
-                                 ignoreVectorize ? ParallelUnit::NotParallel : forall.getParallelUnit(), ignoreVectorize ? 0 : forall.getUnrollFactor())),
+                                 ignoreVectorize ? ParallelUnit::NotParallel : forall.getParallelUnit(), 
+                                 ignoreVectorize ? 0 : forall.getUnrollFactor(),
+                                 (kind==LoopKind::Vectorized) * 4)),
                        posAppend);
 
 }

@@ -41,6 +41,7 @@ protected:
   void visit(const Sqrt*);
   void visit(const Store*);
   void visit(const Assign*);
+  void visit(const Call*) override;
 
   std::map<Expr, std::string, ExprCompare> varMap;
   std::vector<Expr> localVars;

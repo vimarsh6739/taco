@@ -504,11 +504,12 @@ Expr Cast::make(Expr a, Datatype newType) {
 }
 
 Expr Call::make(const std::string& func, const std::vector<Expr>& args, 
-                Datatype type) {
+                Datatype type, bool extern_llvm) {
   Call *call = new Call;
   call->type = type;
   call->func = func;
   call->args = args;
+  call->extern_llvm = extern_llvm;
   return call;
 }
 
@@ -517,14 +518,14 @@ Expr Load::make(Expr arr) {
   return Load::make(arr, Literal::make((int64_t)0));
 }
 
-Expr Load::make(Expr arr, Expr loc) {
+Expr Load::make(Expr arr, Expr loc, size_t vector_width) {
   taco_iassert(loc.type().isInt() || loc.type().isUInt()) 
       << "Can't load from a non-integer offset";
   Load *load = new Load;
   load->type = arr.type();
   load->arr = arr;
   load->loc = loc;
-  load->vectorized = true;
+  load->vector_width = vector_width;
   return load;
 }
 
@@ -609,7 +610,7 @@ Stmt Store::make(Expr arr, Expr loc, Expr data, bool use_atomics, ParallelUnit a
   store->data = data;
   store->use_atomics = use_atomics;
   store->atomic_parallel_unit = atomic_parallel_unit;
-  store->vectorized = false;
+  store->vector_width = 1;
   return store;
 }
 

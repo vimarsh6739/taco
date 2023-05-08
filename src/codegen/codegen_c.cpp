@@ -613,6 +613,25 @@ void CodeGen_C::visit(const Store* op) {
   IRPrinter::visit(op);
 }
 
+void CodeGen_C::visit(const Call* op) {
+  // Handle case of generated extern call to llvm function
+  if (!op->extern_llvm)
+    return IRPrinter::visit(op);
+
+  stream << "shim_" << op->func << "(";
+  parentPrecedence = Precedence::CALL;
+  if (op->args.size() > 0) {
+    if (isa<Load>(op->args[0])) stream << "&";
+    op->args[0].accept(this);
+  }
+  for (size_t i = 1; i < op->args.size(); ++i) {
+    stream << ", ";
+    if (isa<Load>(op->args[i])) stream << "&";
+    op->args[i].accept(this);
+  }
+  stream << ")";
+}
+
 void CodeGen_C::generateShim(const Stmt& func, stringstream &ret) {
   const Function *funcPtr = func.as<Function>();
 

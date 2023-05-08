@@ -500,9 +500,10 @@ struct Cast : public ExprNode<Cast> {
 struct Call : public ExprNode<Call> {
   std::string func;
   std::vector<Expr> args;
+  bool extern_llvm;
 
   static Expr make(const std::string& func, const std::vector<Expr>& args, 
-                   Datatype type);
+                   Datatype type, bool extern_llvm = false);
 
   static const IRNodeType _type_info = IRNodeType::Call;
 };
@@ -511,10 +512,10 @@ struct Call : public ExprNode<Call> {
 struct Load : public ExprNode<Load> {
   Expr arr;
   Expr loc;
-  bool vectorized;  // Used to store vectorization info when outputting rosette.
+  size_t vector_width;  // Used to store vectorization info when outputting rosette.
 
   static Expr make(Expr arr);
-  static Expr make(Expr arr, Expr loc);
+  static Expr make(Expr arr, Expr loc, size_t vector_width = 0);
 
   static const IRNodeType _type_info = IRNodeType::Load;
 };
@@ -578,7 +579,7 @@ struct Store : public StmtNode<Store> {
   Expr data;
   bool use_atomics;
   ParallelUnit atomic_parallel_unit;
-  bool vectorized;  // Used to store vectorization info when outputting rosette.
+  size_t vector_width;  // Used to store vectorization info when outputting rosette.
 
   static Stmt make(Expr arr, Expr loc, Expr data, bool use_atomics=false, ParallelUnit atomic_parallel_unit=ParallelUnit::NotParallel);
 

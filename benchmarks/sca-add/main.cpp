@@ -25,8 +25,8 @@ int main(int argc, char* argv[]) {
 
 //   Tensor<double> B = read("webbase-1M/webbase-1M.mtx", dcsr);
   // Generate a random dense matrix and store it in row-major (dense) format.
-  Tensor<int> C({512}, rm);
-  Tensor<int> B({512},rm);
+  Tensor<int> C({4}, rm);
+  Tensor<int> B({4},rm);
   for (int i = 0; i < C.getDimension(0); ++i) {
     C.insert({i}, i + 1);
     B.insert({i}, i + 1);
@@ -46,21 +46,11 @@ int main(int argc, char* argv[]) {
 
   // Declare the output matrix to be a sparse matrix with the same dimensions as
   // input matrix B, to be also stored as a doubly compressed sparse row matrix.
-  Tensor<int> A({512}, rm);
+  Tensor<int> A({4}, rm);
 
   // Define the SDDMM computation using index notation.
-  IndexVar i("original_i"); 
+  IndexVar i;
   A(i) = B(i) + C(i);
-  IndexStmt stmt = A.getAssignment().concretize();
-
-  IndexVar i0("outer_i"),i1("inner_i");
-  // stmt = stmt.split(i,i0,i1,64).parallelize(i1,ParallelUnit::CPUVector,OutputRaceStrategy::NoRaces).unroll(i1,4);  
-  stmt = stmt.bound(i,i0,512,BoundType::MaxExact).parallelize(i0,ParallelUnit::CPUVector,OutputRaceStrategy::NoRaces);
-  // stmt = stmt.unroll(i1,4);
-  // IndexVar i0;
-  // IndexVar i1;
-  // A.split(i, i0, i1, 32);
-  // A.unroll(i0, 4)
 
   // IndexVar i, j, k;
   // A(i,j) = B(i,k) * C(k,j);
@@ -76,7 +66,7 @@ int main(int argc, char* argv[]) {
 
   // A.parallelize(i,CPUVector);
 
-  A.compile(stmt,false,true);
+  A.compile(true);
   std::cout << "done compiling" << std::endl;
 
   // std::string path = A.emitHydride();
