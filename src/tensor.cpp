@@ -673,10 +673,6 @@ void TensorBase::compile(taco::IndexStmt stmt, bool assembleWhileCompute, bool e
   cacheComputeKernel(concretizedAssign, content->module);
 }
 
-std::string TensorBase::emitHydride() {
-  return content->module->emitHydride();
-}
-
 taco_tensor_t* TensorBase::getTacoTensorT() {
   return getStorage();
 }

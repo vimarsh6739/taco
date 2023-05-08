@@ -341,16 +341,9 @@ void CodeGen_C::visit(const Function* func) {
     } while (stmt != oldStmt);
   }
 
-  // This is where we rewrite the body of the function to hydride for sythesis.
+  // This is where we rewrite the body of the function using hydride for sythesis.
   if (emitHydride) {
     stmt = optimize_instructions_synthesis(stmt);
-    // update varmap
-
-    // find all expressions we want to synth
-    // output rosette code for each
-    // run synthesis on each
-    // replace with external function call
-    // output the ll files
   }
 
   // output body
@@ -610,26 +603,34 @@ void CodeGen_C::visit(const Store* op) {
     doIndent();
     stream << getAtomicPragma() << endl;
   }
-  IRPrinter::visit(op);
-}
 
-void CodeGen_C::visit(const Call* op) {
   // Handle case of generated extern call to llvm function
-  if (!op->extern_llvm)
+  if (!isa<Call>(op->data))
     return IRPrinter::visit(op);
 
-  stream << "shim_" << op->func << "(";
+  const Call* call = op->data.as<Call>();
+
+  if (!call->extern_llvm)
+    return IRPrinter::visit(op);
+
+  doIndent();
+  stream << "shim_" << call->func << "(";
+
   parentPrecedence = Precedence::CALL;
-  if (op->args.size() > 0) {
-    if (isa<Load>(op->args[0])) stream << "&";
-    op->args[0].accept(this);
-  }
-  for (size_t i = 1; i < op->args.size(); ++i) {
+  stream << "&";
+  op->arr.accept(this);
+  stream << "[";
+  op->loc.accept(this);
+  stream << "]";
+
+  for (size_t i = 0; i < call->args.size(); ++i) {
     stream << ", ";
-    if (isa<Load>(op->args[i])) stream << "&";
-    op->args[i].accept(this);
+    if (isa<Load>(call->args[i])) 
+      stream << "&";
+    call->args[i].accept(this);
   }
-  stream << ")";
+  stream << ");"
+         << std::endl;
 }
 
 void CodeGen_C::generateShim(const Stmt& func, stringstream &ret) {

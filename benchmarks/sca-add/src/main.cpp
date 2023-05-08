@@ -49,8 +49,8 @@ int main(int argc, char* argv[]) {
   Tensor<int> A({4}, rm);
 
   // Define the SDDMM computation using index notation.
-  IndexVar i;
-  A(i) = B(i) + C(i);
+  IndexVar i("i");
+  A(i) = B(i) + C(i) + 10;
 
   // IndexVar i, j, k;
   // A(i,j) = B(i,k) * C(k,j);
@@ -66,7 +66,13 @@ int main(int argc, char* argv[]) {
 
   // A.parallelize(i,CPUVector);
 
-  A.compile(true);
+  IndexStmt stmt = A.getAssignment().concretize();
+
+  IndexVar j("j");
+  stmt = stmt.bound(i, j, 4, BoundType::MaxExact)
+             .parallelize(j, ParallelUnit::CPUVector, OutputRaceStrategy::NoRaces);
+
+  A.compile(stmt, false, true);
   std::cout << "done compiling" << std::endl;
 
   // std::string path = A.emitHydride();

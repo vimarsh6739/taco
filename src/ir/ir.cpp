@@ -514,7 +514,7 @@ Expr Call::make(const std::string& func, const std::vector<Expr>& args,
 }
 
 // Load
-Expr Load::make(Expr arr) {
+Expr Load::make(Expr arr, size_t vector_width) {
   return Load::make(arr, Literal::make((int64_t)0));
 }
 
@@ -603,14 +603,14 @@ Stmt Scope::make(Stmt scopedStmt) {
 }
 
 // Store to an array
-Stmt Store::make(Expr arr, Expr loc, Expr data, bool use_atomics, ParallelUnit atomic_parallel_unit) {
+Stmt Store::make(Expr arr, Expr loc, Expr data, bool use_atomics, ParallelUnit atomic_parallel_unit, size_t vector_width) {
   Store *store = new Store;
   store->arr = arr;
   store->loc = loc;
   store->data = data;
   store->use_atomics = use_atomics;
   store->atomic_parallel_unit = atomic_parallel_unit;
-  store->vector_width = 1;
+  store->vector_width = vector_width;
   return store;
 }
 

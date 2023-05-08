@@ -165,8 +165,7 @@ string Module::compile(bool emitHydride) {
     get_default_CUDA_compiler_flags());
     file_ending = ".cu";
     shims_file = prefix + "_shims.cpp";
-  }
-  else {
+  } else {
     cc = util::getFromEnv(target.compiler_env, target.compiler);
 #ifdef TACO_DEBUG
     // In debug mode, compile the generated code with debug symbols and a
@@ -183,28 +182,38 @@ string Module::compile(bool emitHydride) {
     file_ending = ".c";
     shims_file = "";
   }
-  
-  string cmd = cc + " " + cflags + " " +
-    prefix + file_ending + " " + shims_file + " " + 
-    "-o " + fullpath + " -lm";
 
   // open the output file & write out the source
   compileToSource(tmpdir, libname, emitHydride);
-  
+
   // write out the shims
   writeShims(funcs, tmpdir, libname);
-  
+
   // now compile it
+  string cmd;
   int err;
   if (emitHydride) {
-    // do something
+    cmd = "clang -g -O0 -std=c99 -S -emit-llvm " + prefix + ".c -o " + prefix + ".ll";
     err = system(cmd.data());
-  } {
-    err = system(cmd.data());
-  }
+    taco_uassert(err == 0) << "Compilation command failed:" << std::endl << cmd << std::endl << "returned " << err;
 
-  taco_uassert(err == 0) << "Compilation command failed:\n" << cmd
-    << "\nreturned " << err;
+    cmd = "llvm-link -S " + prefix + ".ll bin/llvm_shim_tydride.ll bin/tydride.ll.legalize.ll > " + prefix + "_linked.ll";
+    err = system(cmd.data());
+    taco_uassert(err == 0) << "Linking command failed:" << std::endl << cmd << std::endl << "returned " << err;
+
+    // cmd = "opt -O3 --always-inline -S " + prefix + "_linked.ll > " + prefix + "_linked_opt.ll";
+    // err = system(cmd.data());
+    // taco_uassert(err == 0) << "Inlining command failed:" << std::endl << cmd << std::endl << "returned " << err;
+
+    cmd = "clang -shared -fPIC " + prefix + "_linked_opt.ll -o " + fullpath + " -lm";
+    err = system(cmd.data());
+    taco_uassert(err == 0) << "Compilation command failed:" << std::endl << cmd << std::endl << "returned " << err;
+
+  } else {
+    cmd = cc + " " + cflags + " " + prefix + file_ending + " " + shims_file + " " + "-o " + fullpath + " -lm";
+    err = system(cmd.data());
+    taco_uassert(err == 0) << "Compilation command failed:" << std::endl << cmd << std::endl << "returned " << err;
+  }
 
   // use dlsym() to open the compiled library
   if (lib_handle) {
@@ -214,26 +223,6 @@ string Module::compile(bool emitHydride) {
   taco_uassert(lib_handle) << "Failed to load generated code, error is: " << dlerror();
 
   return fullpath;
-}
-
-std::string Module::emitHydride() {
-  std::cout << "ש" << std::endl;
-  string filepath = tmpdir + libname + ".rkt";
-  std::stringstream output;
-  output.str("");
-  output.clear();
-
-  std::shared_ptr<CodeGen> codegen = CodeGen::init_hydride(output, CodeGen::ImplementationGen);
-  // std::shared_ptr<CodeGen> codegen = CodeGen::init_default(output, CodeGen::ImplementationGen);
-
-  for (auto func: funcs)
-    codegen->compile(func, true);
-
-  ofstream output_file;
-  output_file.open(filepath);
-  output_file << output.str();
-  output_file.close();
-  return filepath;
 }
 
 void Module::setSource(string source) {

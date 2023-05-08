@@ -514,7 +514,7 @@ struct Load : public ExprNode<Load> {
   Expr loc;
   size_t vector_width;  // Used to store vectorization info when outputting rosette.
 
-  static Expr make(Expr arr);
+  static Expr make(Expr arr, size_t vector_width = 0);
   static Expr make(Expr arr, Expr loc, size_t vector_width = 0);
 
   static const IRNodeType _type_info = IRNodeType::Load;
@@ -581,7 +581,7 @@ struct Store : public StmtNode<Store> {
   ParallelUnit atomic_parallel_unit;
   size_t vector_width;  // Used to store vectorization info when outputting rosette.
 
-  static Stmt make(Expr arr, Expr loc, Expr data, bool use_atomics=false, ParallelUnit atomic_parallel_unit=ParallelUnit::NotParallel);
+  static Stmt make(Expr arr, Expr loc, Expr data, bool use_atomics=false, ParallelUnit atomic_parallel_unit=ParallelUnit::NotParallel, size_t vector_width = 1);
 
   static const IRNodeType _type_info = IRNodeType::Store;
 };
