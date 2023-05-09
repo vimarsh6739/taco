@@ -29,7 +29,7 @@ class HydrideEmitter : public IRVisitor {
 
  public:
   // map from taco load instructions to racket registers
-  std::map<const Load*, uint> loadToRegMap;
+  std::vector<std::pair<const Load*, uint>> loadToRegMap;
 
   // map from taco variables to racket registers
   std::map<const Var*, uint> varToRegMap;
@@ -80,7 +80,7 @@ class HydrideEmitter : public IRVisitor {
 
   class LoadVarMapVisitor : public IRVisitor {
    public:
-    LoadVarMapVisitor(std::map<const Load*, uint>& loadToRegMap, std::map<const Var*, uint>& varToRegMap) 
+    LoadVarMapVisitor(std::vector<std::pair<const Load*, uint>>& loadToRegMap, std::map<const Var*, uint>& varToRegMap) 
                     : loadToRegMap(loadToRegMap), varToRegMap(varToRegMap) {}
 
     void visit(const Expr* op) { op->accept(this); }
@@ -89,7 +89,7 @@ class HydrideEmitter : public IRVisitor {
     using IRVisitor::visit;
 
     // map from taco load instructions to racket registers
-    std::map<const Load*, uint>& loadToRegMap;
+    std::vector<std::pair<const Load*, uint>>& loadToRegMap;
 
     // map from taco variables to racket registers
     std::map<const Var*, uint>& varToRegMap;
@@ -102,10 +102,27 @@ class HydrideEmitter : public IRVisitor {
     }
 
     void visit(const Load* op) override {
-      if (loadToRegMap.find(op) == loadToRegMap.end()) {
-        size_t reg_counter = varToRegMap.size() + loadToRegMap.size();
-        loadToRegMap[op] = reg_counter;
+      std::string op_hash;
+      {
+        std::stringstream out;
+        IRPrinter printer(out);
+        op->accept(&printer);
+        op_hash = out.str();
       }
+      
+      for (const auto& item : loadToRegMap) {
+        std::string item_hash;
+        {
+          std::stringstream out;
+          IRPrinter printer(out);
+          item.first->accept(&printer);
+          item_hash = out.str();
+        }
+        if (item_hash == op_hash)
+          return;
+      }
+      size_t reg_counter = varToRegMap.size() + loadToRegMap.size();
+      loadToRegMap.emplace_back(op, reg_counter);
     }
   };
 
@@ -398,10 +415,28 @@ class HydrideEmitter : public IRVisitor {
   }
 
   void visit(const Load* op) {
-    if (loadToRegMap.find(op) != loadToRegMap.end())
-      stream << "reg_" << loadToRegMap[op];
-    else
-      taco_ierror << "Load node not found in loadToRegMap.";
+    std::string op_hash;
+    {
+      std::stringstream out;
+      IRPrinter printer(out);
+      op->accept(&printer);
+      op_hash = out.str();
+    }
+    
+    for (const auto& item : loadToRegMap) {
+      std::string item_hash;
+      {
+        std::stringstream out;
+        IRPrinter printer(out);
+        item.first->accept(&printer);
+        item_hash = out.str();
+      }
+      if (item_hash == op_hash) {
+        stream << "reg_" << item.second;
+        return;
+      }
+    }
+    taco_ierror << "Load node not found in loadToRegMap.";
   }
 
   void visit(const Malloc* op) {
