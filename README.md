@@ -195,3 +195,4 @@ the same effect:
 
 For more information, see our paper on the taco tools
 [taco: A Tool to Generate Tensor Algebra Kernels](http://tensor-compiler.org/files/kjolstad-ase17-taco-tools.pdf).
+
