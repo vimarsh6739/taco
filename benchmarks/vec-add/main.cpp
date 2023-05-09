@@ -47,10 +47,12 @@ int main(int argc, char* argv[]) {
   // Declare the output matrix to be a sparse matrix with the same dimensions as
   // input matrix B, to be also stored as a doubly compressed sparse row matrix.
   Tensor<int> A({512}, rm);
+  Tensor<int> A2(0);
 
   // Define the SDDMM computation using index notation.
   IndexVar i("original_i"); 
   A(i) = B(i) + C(i);
+  A2 = sum(i,A(i));
   IndexStmt stmt = A.getAssignment().concretize();
 
   IndexVar i0("outer_i"),i1("inner_i");
@@ -78,7 +80,7 @@ int main(int argc, char* argv[]) {
 
   A.compile(stmt,false,true);
   std::cout << "done compiling" << std::endl;
-
+  
   // std::string path = A.emitHydride();
   // std::cout << "emitted hydride @ " << path << std::endl;
 
@@ -92,8 +94,11 @@ int main(int argc, char* argv[]) {
 
   A.compute();
   std::cout << "done computing" << std::endl;
-
-
+  A2.compile();
+  A2.assemble();
+  A2.compute();
+  std::cout << "done computing A2" << std::endl;
+  std::cout << A2.at(std::vector<int>(0)) << std::endl;
   // Write the output of the computation to file (stored in the Matrix Market format).
   // write("A.mtx", A);
 }
