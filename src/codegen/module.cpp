@@ -183,6 +183,10 @@ string Module::compile(bool emitHydride) {
       err = system(cmd.data());
       taco_uassert(err == 0) << "Compilation command failed:" << std::endl << cmd << std::endl << "returned " << err;
 
+      cmd = "cp " + prefix + "_linked_opt.ll " + "bin/linked_opt.ll";
+      err = system(cmd.data());
+      taco_uassert(err == 0) << "Error copying the linked ll file." << std::endl;
+
       // std::cout << "Beginning hydride emission" << std::endl;
       // cmd = "clang -g -O0 -std=c99 -shared -fPIC " + prefix + ".c bin/llvm_shim_tydride.ll bin/tydride.ll.legalize.ll -o " + fullpath + " -lm";
       // err = system(cmd.data());

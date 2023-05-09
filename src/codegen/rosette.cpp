@@ -58,7 +58,7 @@ class HydrideEmitter : public IRVisitor {
     emit_expr(op);
     stream << std::endl;
 
-    emit_hydride_synthesis(/* expr_depth */ 3, /* VF */ vector_width);
+    emit_hydride_synthesis(/* expr_depth */ 2, /* VF */ vector_width);
     stream << std::endl;
     emit_compile_to_llvm(benchmark_name, expr_id);
     stream << std::endl;
