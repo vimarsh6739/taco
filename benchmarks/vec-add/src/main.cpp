@@ -13,7 +13,7 @@ int main(int argc, char* argv[]) {
   // and (optionally) the order in which dimensions should be stored. The formats
   // declared below correspond to doubly compressed sparse row (dcsr), row-major
   // dense (rm), and column-major dense (dm).
-  // Format dcsr({Dense,Dense});
+  Format sparrrse({Sparse});
   Format   rm({Dense});
   // Format   cm({Dense,Dense}, {1,0});
 
@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
 //   Tensor<double> B = read("webbase-1M/webbase-1M.mtx", dcsr);
   // Generate a random dense matrix and store it in row-major (dense) format.
   Tensor<int> C({512}, rm);
-  Tensor<int> B({512},rm);
+  Tensor<int> B({512}, rm);
   for (int i = 0; i < C.getDimension(0); ++i) {
     C.insert({i}, i + 1);
     B.insert({i}, i + 1);
@@ -52,12 +52,12 @@ int main(int argc, char* argv[]) {
   // Define the SDDMM computation using index notation.
   IndexVar i("original_i"); 
   A(i) = B(i) + C(i);
-  A2 = sum(i,A(i));
+  A2 = sum(i, A(i));
   IndexStmt stmt = A.getAssignment().concretize();
 
   IndexVar i0("outer_i"),i1("inner_i");
   // stmt = stmt.split(i,i0,i1,64).parallelize(i1,ParallelUnit::CPUVector,OutputRaceStrategy::NoRaces).unroll(i1,4);  
-  stmt = stmt.bound(i,i0,512,BoundType::MaxExact).parallelize(i0,ParallelUnit::CPUVector,OutputRaceStrategy::NoRaces);
+  stmt = stmt.bound(i, i0, 512, BoundType::MaxExact).parallelize(i0, ParallelUnit::CPUVector, OutputRaceStrategy::NoRaces);
   // stmt = stmt.unroll(i1,4);
   // IndexVar i0;
   // IndexVar i1;
@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
 
   // A.parallelize(i,CPUVector);
 
-  A.compile(stmt,false,true);
+  A.compile(stmt, false, true);
   std::cout << "done compiling" << std::endl;
   
   // std::string path = A.emitHydride();
@@ -94,9 +94,14 @@ int main(int argc, char* argv[]) {
 
   A.compute();
   std::cout << "done computing" << std::endl;
-  A2.compile();
+  A2.compile(/* emitHydride */ true);
   A2.assemble();
+
+  // auto start = std::chrono::system_clock::now();
   A2.compute();
+  // auto end = std::chrono::system_clock::now();
+  // std::cout << "Compilation took " << (end - start).count() << "seconds." << std::endl;
+
   std::cout << "done computing A2" << std::endl;
   std::cout << A2.at(std::vector<int>(0)) << std::endl;
   // Write the output of the computation to file (stored in the Matrix Market format).

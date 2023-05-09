@@ -265,7 +265,7 @@ protected:
 };
 
 CodeGen_C::CodeGen_C(std::ostream &dest, OutputKind outputKind, bool simplify, bool emitHydride)
-    : CodeGen(dest, false, simplify, C), out(dest), outputKind(outputKind), emitHydride(emitHydride) {}
+    : CodeGen(dest, false, simplify, C), out(dest), outputKind(outputKind), emitHydride(emitHydride), mutated_expr(false) {}
 
 CodeGen_C::~CodeGen_C() {}
 
@@ -343,7 +343,13 @@ void CodeGen_C::visit(const Function* func) {
 
   // This is where we rewrite the body of the function using hydride for sythesis.
   if (emitHydride) {
-    stmt = optimize_instructions_synthesis(stmt);
+    // std::cout << "ORIGINAL STMT:" << std::endl;
+    // IRPrinter(std::cout).print(stmt);
+
+    stmt = optimize_instructions_synthesis(stmt, mutated_expr);
+
+    // std::cout << "MODIFIED STMT:" << std::endl;
+    // IRPrinter(std::cout).print(stmt);
   }
 
   // output body
@@ -444,26 +450,28 @@ static string getAtomicPragma() {
 // Docs for vectorization pragmas:
 // http://clang.llvm.org/docs/LanguageExtensions.html#extensions-for-loop-hint-optimizations
 void CodeGen_C::visit(const For* op) {
-  switch (op->kind) {
-    case LoopKind::Vectorized:
-      doIndent();
-      out << genVectorizePragma(op->vec_width);
-      out << "\n";
-      break;
-    case LoopKind::Static:
-    case LoopKind::Dynamic:
-    case LoopKind::Runtime:
-    case LoopKind::Static_Chunked:
-      doIndent();
-      out << getParallelizePragma(op->kind);
-      out << "\n";
-      break;
-    default:
-      if (op->unrollFactor > 0) {
+  if (!emitHydride) {
+    switch (op->kind) {
+      case LoopKind::Vectorized:
         doIndent();
-        out << getUnrollPragma(op->unrollFactor) << endl;
-      }
-      break;
+        out << genVectorizePragma(op->vec_width);
+        out << "\n";
+        break;
+      case LoopKind::Static:
+      case LoopKind::Dynamic:
+      case LoopKind::Runtime:
+      case LoopKind::Static_Chunked:
+        doIndent();
+        out << getParallelizePragma(op->kind);
+        out << "\n";
+        break;
+      default:
+        if (op->unrollFactor > 0) {
+          doIndent();
+          out << getUnrollPragma(op->unrollFactor) << endl;
+        }
+        break;
+    }
   }
 
   doIndent();

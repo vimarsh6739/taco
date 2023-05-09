@@ -10,7 +10,7 @@
 namespace taco {
 namespace ir {
 
-Stmt optimize_instructions_synthesis(Stmt);
+Stmt optimize_instructions_synthesis(Stmt stmt, bool& mutated_expr);
 
 /**
  * 

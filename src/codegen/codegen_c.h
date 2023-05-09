@@ -25,6 +25,8 @@ public:
   /// a mix of taco_tensor_t* and scalars into a function call
   static void generateShim(const Stmt& func, std::stringstream &stream);
 
+  bool did_mutate_expr() { return mutated_expr; }
+
 protected:
   using IRPrinter::visit;
 
@@ -52,6 +54,7 @@ protected:
   int labelCount;
   bool emittingCoroutine;
   bool emitHydride;
+  bool mutated_expr;
 
   class FindVars;
 

@@ -30,7 +30,7 @@ public:
 
   /// Compile the module into a source file located at the specified location
   /// path and prefix.  The generated source will be path/prefix.{.c|.bc, .h}
-  void compileToSource(std::string path, std::string prefix, bool emitHydride=false);
+  bool compileToSource(std::string path, std::string prefix, bool emitHydride=false);
   
   /// Compile the module into a static library located at the specified location
   /// path and prefix.  The generated library will be path/prefix.a

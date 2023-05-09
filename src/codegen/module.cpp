@@ -40,84 +40,57 @@ void Module::addFunction(Stmt func) {
   funcs.push_back(func);
 }
 
-void Module::compileToSource(string path, string prefix, bool emitHydride) {
+bool Module::compileToSource(string path, string prefix, bool emitHydride) {
   std::cout << "Writing generated C file to: " << path << "" << prefix << ".c" << std::endl;
-  if (emitHydride){
+  bool mutated_expr = false;
 
-    if (!moduleFromUserSource) {
+  if (!moduleFromUserSource) {
+  
+    // create a codegen instance and add all the funcs
+    bool didGenRuntime = false;
     
-      // create a codegen instance and add all the funcs
-      bool didGenRuntime = false;
-      
-      header.str("");
-      header.clear();
-      source.str("");
-      source.clear();
+    header.str("");
+    header.clear();
+    source.str("");
+    source.clear();
 
-      taco_tassert(target.arch == Target::C99) <<
-          "Only C99 codegen supported currently";
-      std::shared_ptr<CodeGen> sourcegen =
-          CodeGen::init_hydride(source, CodeGen::ImplementationGen);
-      std::shared_ptr<CodeGen> headergen =
-              CodeGen::init_hydride(header, CodeGen::HeaderGen);
+    taco_tassert(target.arch == Target::C99) <<
+        "Only C99 codegen supported currently";
 
-      for (auto func: funcs) {
-        sourcegen->compile(func, !didGenRuntime);
-        headergen->compile(func, !didGenRuntime);
-        didGenRuntime = true;
-      }
+    std::shared_ptr<CodeGen> sourcegen;
+    std::shared_ptr<CodeGen> headergen;
+    
+    if (emitHydride) {
+      sourcegen = CodeGen::init_hydride(source, CodeGen::ImplementationGen);
+      headergen = CodeGen::init_hydride(header, CodeGen::HeaderGen);
+    } else {
+      sourcegen = CodeGen::init_default(source, CodeGen::ImplementationGen);
+      headergen = CodeGen::init_default(header, CodeGen::HeaderGen);
     }
 
-    ofstream source_file;
-    string file_ending = should_use_CUDA_codegen() ? ".cu" : ".c";
-    source_file.open(path+prefix+file_ending);
-    source_file << source.str();
-    source_file.close();
-    
-    ofstream header_file;
-    header_file.open(path+prefix+".h");
-    header_file << header.str();
-    header_file.close();
-
-
-  } else {
-
-
-    if (!moduleFromUserSource) {
-    
-      // create a codegen instance and add all the funcs
-      bool didGenRuntime = false;
-      
-      header.str("");
-      header.clear();
-      source.str("");
-      source.clear();
-
-      taco_tassert(target.arch == Target::C99) <<
-          "Only C99 codegen supported currently";
-      std::shared_ptr<CodeGen> sourcegen =
-          CodeGen::init_default(source, CodeGen::ImplementationGen);
-      std::shared_ptr<CodeGen> headergen =
-              CodeGen::init_default(header, CodeGen::HeaderGen);
-
-      for (auto func: funcs) {
-        sourcegen->compile(func, !didGenRuntime);
-        headergen->compile(func, !didGenRuntime);
-        didGenRuntime = true;
-      }
+    for (auto func: funcs) {
+      sourcegen->compile(func, !didGenRuntime);
+      headergen->compile(func, !didGenRuntime);
+      didGenRuntime = true;
     }
 
-    ofstream source_file;
-    string file_ending = should_use_CUDA_codegen() ? ".cu" : ".c";
-    source_file.open(path+prefix+file_ending);
-    source_file << source.str();
-    source_file.close();
-    
-    ofstream header_file;
-    header_file.open(path+prefix+".h");
-    header_file << header.str();
-    header_file.close();
+    if (emitHydride) {
+      mutated_expr = std::dynamic_pointer_cast<CodeGen_C>(sourcegen)->did_mutate_expr();
+    }
   }
+
+  ofstream source_file;
+  string file_ending = should_use_CUDA_codegen() ? ".cu" : ".c";
+  source_file.open(path+prefix+file_ending);
+  source_file << source.str();
+  source_file.close();
+  
+  ofstream header_file;
+  header_file.open(path+prefix+".h");
+  header_file << header.str();
+  header_file.close();
+
+  return mutated_expr;
 }
 
 void Module::compileToStaticLibrary(string path, string prefix, bool emitHydride) {
@@ -184,7 +157,7 @@ string Module::compile(bool emitHydride) {
   }
 
   // open the output file & write out the source
-  compileToSource(tmpdir, libname, emitHydride);
+  bool mutated_expr = compileToSource(tmpdir, libname, emitHydride);
 
   // write out the shims
   writeShims(funcs, tmpdir, libname);
@@ -193,27 +166,32 @@ string Module::compile(bool emitHydride) {
   string cmd;
   int err;
   if (emitHydride) {
-    // cmd = "clang -g -O0 -std=c99 -S -emit-llvm " + prefix + ".c -o " + prefix + ".ll";
-    // err = system(cmd.data());
-    // taco_uassert(err == 0) << "Compilation command failed:" << std::endl << cmd << std::endl << "returned " << err;
+    if (mutated_expr) {
+      cmd = "clang -g -O0 -std=c99 -S -emit-llvm " + prefix + ".c -o " + prefix + ".ll";
+      err = system(cmd.data());
+      taco_uassert(err == 0) << "Compilation command failed:" << std::endl << cmd << std::endl << "returned " << err;
 
-    // cmd = "llvm-link -S " + prefix + ".ll bin/llvm_shim_tydride.ll bin/tydride.ll.legalize.ll > " + prefix + "_linked.ll";
-    // err = system(cmd.data());
-    // taco_uassert(err == 0) << "Linking command failed:" << std::endl << cmd << std::endl << "returned " << err;
+      cmd = "llvm-link -S " + prefix + ".ll bin/llvm_shim_tydride.ll bin/tydride.ll.legalize.ll > " + prefix + "_linked.ll";
+      err = system(cmd.data());
+      taco_uassert(err == 0) << "Linking command failed:" << std::endl << cmd << std::endl << "returned " << err;
 
-    // cmd = "opt -O3 --always-inline -S " + prefix + "_linked.ll > " + prefix + "_linked_opt.ll";
-    // err = system(cmd.data());
-    // taco_uassert(err == 0) << "Inlining command failed:" << std::endl << cmd << std::endl << "returned " << err;
+      cmd = "opt --O3 --adce --aggressive-instcombine --always-inline -S " + prefix + "_linked.ll > " + prefix + "_linked_opt.ll";
+      err = system(cmd.data());
+      taco_uassert(err == 0) << "Inlining command failed:" << std::endl << cmd << std::endl << "returned " << err;
 
-    // cmd = "clang -shared -fPIC " + prefix + "_linked_opt.ll -o " + fullpath + " -lm";
-    // err = system(cmd.data());
-    // taco_uassert(err == 0) << "Compilation command failed:" << std::endl << cmd << std::endl << "returned " << err;
-    
-    std::cout << "Beginning hydride emission" << std::endl;
-    cmd = "clang -g -O0 -std=c99 -shared -fPIC " + prefix + ".c bin/llvm_shim_tydride.ll bin/tydride.ll.legalize.ll -o " + fullpath + " -lm";
-    err = system(cmd.data());
-    taco_uassert(err == 0) << "Compilation command failed:" << std::endl << cmd << std::endl << "returned " << err;
+      cmd = "clang -shared -fPIC " + prefix + "_linked_opt.ll -o " + fullpath + " -lm";
+      err = system(cmd.data());
+      taco_uassert(err == 0) << "Compilation command failed:" << std::endl << cmd << std::endl << "returned " << err;
 
+      // std::cout << "Beginning hydride emission" << std::endl;
+      // cmd = "clang -g -O0 -std=c99 -shared -fPIC " + prefix + ".c bin/llvm_shim_tydride.ll bin/tydride.ll.legalize.ll -o " + fullpath + " -lm";
+      // err = system(cmd.data());
+      // taco_uassert(err == 0) << "Compilation command failed:" << std::endl << cmd << std::endl << "returned " << err;
+    } else {
+      cmd = "clang -g -O0 -std=c99 -shared -fPIC " + prefix + ".c -o " + fullpath + " -lm";
+      err = system(cmd.data());
+      taco_uassert(err == 0) << "Compilation command failed:" << std::endl << cmd << std::endl << "returned " << err;
+    }
   } else {
     cmd = cc + " " + cflags + " " + prefix + file_ending + " " + shims_file + " " + "-o " + fullpath + " -lm";
     err = system(cmd.data());

@@ -535,7 +535,7 @@ class LoopOptimizer : public IRRewriter {
  protected:
   using IRRewriter::visit;
   ExprOptimizer expr_optimizer;
-  size_t in_vectorizable_loop;
+  size_t in_vectorizable_loop = 0;
 
   class LoopDetector : public IRVisitor {
     // Visits a Taco IR for loop and returns whether there is a inner loop.
@@ -619,9 +619,8 @@ class LoopOptimizer : public IRRewriter {
 } // anonymous namespace
 
 
-Stmt optimize_instructions_synthesis(Stmt stmt) {
+Stmt optimize_instructions_synthesis(Stmt stmt, bool& mutated_expr) {
   std::string benchmark_name = "tydride";
-  bool mutated_expr;
 
   // Run the optimizer that targets the innermost vectorizable loop.
   stmt = LoopOptimizer(benchmark_name, mutated_expr).rewrite(stmt);
