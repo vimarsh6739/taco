@@ -389,10 +389,20 @@ ir::Stmt simplify(const ir::Stmt& stmt) {
         loopDependentVars.insert(op->lhs);
       }
     }
+
+    // This might look like a DE-OPTIMIZATION, but it is necessary to 
+    // synthesize vectorizing schedules in innermost For loops 
+    void visit(const Store* op){
+      if (util::contains(defLevel,op->loc) && 
+          defLevel.at(op->loc) < loopLevel){
+            // unsafe candidate for copy prop.
+        loopDependentVars.insert(op->loc);
+      }
+    }
   };
   FindLoopDependentVars findLoopDepVars;
   stmt.accept(&findLoopDepVars);
-
+  
   // Copy propagation (remove candidate var definitions and replace uses) and
   // expression simplification. Also identify non-redundant variable 
   // declarations.
@@ -415,11 +425,24 @@ ir::Stmt simplify(const ir::Stmt& stmt) {
     std::multimap<Expr,Expr> dependencies;
     util::ScopedMap<Expr,Stmt> declarations;
     std::set<Expr> loopDependentVars;
+    int forLoopLevel = 0;
 
     using ExpressionSimplifier::visit;
 
     Simplifier(const std::set<Expr>& loopDependentVars) : 
         loopDependentVars(loopDependentVars) {}
+
+    void visit(const For* op){
+      if(op->kind==LoopKind::Vectorized) forLoopLevel++;
+      Stmt contents = rewrite(op->contents);
+      if(contents == op->contents){
+        stmt = op;
+      }
+      else{
+        stmt = For::make(op->var,op->start,op->end,op->increment,contents,op->kind,op->parallel_unit,op->unrollFactor,op->vec_width);
+      }
+      if(op->kind==LoopKind::Vectorized) forLoopLevel--;
+    }
 
     void visit(const Scope* scope) {
       declarations.scope();
@@ -440,7 +463,13 @@ ir::Stmt simplify(const ir::Stmt& stmt) {
 //            << "Copy propagation pass currently does not support variables "
 //            << "with same name declared in nested scopes: " << decl->var.as<Var>()->name;
         varsToReplace.insert({decl->var, {rhs, stmt}});
-        dependencies.insert({rhs, decl->var});
+        dependencies.insert({rhs, decl->var});//rhs->variable dependency
+      }
+      else if(decl->var.type().isInt() && 
+              !util::contains(loopDependentVars,decl->var) && forLoopLevel>0){
+        // Unlock aggressive copy propogation inside candidate vector-loop bodies
+        varsToReplace.insert({decl->var,{rhs,stmt}});
+        dependencies.insert({rhs,decl->var});
       }
     }
 
@@ -459,6 +488,7 @@ ir::Stmt simplify(const ir::Stmt& stmt) {
         return;
       }
       
+      // lhs is not a candidate to be copy-propogated - remove it from varsToReplace
       std::queue<Expr> invalidVars;
       invalidVars.push(assign->lhs);
 
@@ -470,11 +500,28 @@ ir::Stmt simplify(const ir::Stmt& stmt) {
           varsToReplace.remove(invalidVar);
         }
 
+        // Handle loop-carried dependencies, this assignment may mess with the 
+        // previous varDecls, so just don't remove it!
         auto range = dependencies.equal_range(invalidVar);
         for (auto dep = range.first; dep != range.second; ++dep) {
           invalidVars.push(dep->second);
         }
       }
+    }
+
+    void visit(const Store* store){
+      // arr[loc] = data
+      Expr loc = rewrite(store->loc);
+      Expr data = rewrite(store->data);
+      stmt = (loc == store->loc && data == store->data)? store :
+              Store::make(store->arr,loc,data,store->use_atomics,store->atomic_parallel_unit,store->vector_width);
+    }
+
+    void visit(const Load* load){
+      // arr[loc]
+      // Replace loc if possible
+      Expr loc = rewrite(load->loc);
+      expr = (loc == load->loc)? load : Load::make(load->arr,loc,load->vector_width);
     }
 
     void visit(const Var* var) {
@@ -486,7 +533,6 @@ ir::Stmt simplify(const ir::Stmt& stmt) {
   };
   Simplifier copyPropagation(findLoopDepVars.loopDependentVars);
   Stmt simplifiedStmt = copyPropagation.rewrite(stmt);
-
   // Remove redundant variable declarations.
   struct RemoveRedundantStmts : public IRRewriter {
     std::set<Stmt> necessaryDecls;

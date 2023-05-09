@@ -540,6 +540,7 @@ class LoopOptimizer : public IRRewriter {
   class LoopDetector : public IRVisitor {
     // Visits a Taco IR for loop and returns whether there is a inner loop.
    public:
+    bool found;
     LoopDetector() : found(false) {};
 
     bool visit(const Stmt& op) {
@@ -549,7 +550,6 @@ class LoopOptimizer : public IRRewriter {
 
    protected:
     using IRVisitor::visit;
-    bool found;
 
     void visit(const For* op) override { found = true; }
     void visit(const While* op) override {found = true; }
@@ -581,13 +581,14 @@ class LoopOptimizer : public IRRewriter {
 
   void visit(const For* op) {
     // If this is not the innermost loop, keep traversing
+    loop_detector.found = false;
     if (loop_detector.visit(op->contents))
       return IRRewriter::visit(op);
 
     // Check if the loop is vectorizable
     if (op->kind != LoopKind::Vectorized)
       return IRRewriter::visit(op);
-    
+    std::cout << "Vector width for current for loop is " << op->vec_width << std::endl;
     in_vectorizable_loop++;
     expr_optimizer.vector_width = op->vec_width;
 

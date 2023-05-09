@@ -332,7 +332,7 @@ void CodeGen_C::visit(const Function* func) {
 
   Stmt stmt = isa<Scope>(func->body) ? to<Scope>(func->body)->scopedStmt : func->body;
 
-  // Attempt simplification before running synthesis.
+  // Attempt simplification+copy propogation before running synthesis.
   if (simplify) {
     Stmt oldStmt;
     do {
@@ -346,6 +346,13 @@ void CodeGen_C::visit(const Function* func) {
     // std::cout << "ORIGINAL STMT:" << std::endl;
     // IRPrinter(std::cout).print(stmt);
 
+    // if (simplify) {
+    //   Stmt oldStmt;
+    //   do {
+    //     oldStmt = stmt;
+    //     stmt = ir::simplify(stmt);
+    //   } while (stmt != oldStmt);
+    // }
     stmt = optimize_instructions_synthesis(stmt, mutated_expr);
 
     // std::cout << "MODIFIED STMT:" << std::endl;
