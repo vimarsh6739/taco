@@ -36,9 +36,10 @@ class HydrideEmitter : public IRVisitor {
 
   HydrideEmitter(std::ostream& stream) : stream(stream) {};
 
-  void translate(const Expr* op, std::string benchmark_name, size_t expr_id, size_t vector_width) {
+  bool translate(const Expr* op, std::string benchmark_name, size_t expr_id, size_t vector_width) {
     bitwidth = 512;
     this->vector_width = vector_width;
+    valid = true;
 
     emit_racket_imports();
     stream << std::endl;
@@ -64,6 +65,8 @@ class HydrideEmitter : public IRVisitor {
     stream << std::endl;
     emit_write_synth_log_to_file(benchmark_name, expr_id);
     stream << std::endl;
+
+    return valid;
   }
 
  protected:
@@ -74,6 +77,7 @@ class HydrideEmitter : public IRVisitor {
   size_t expr_count;
   size_t bitwidth;
   size_t vector_width = 1;  // Vector width of the current expression.
+  bool valid;
 
   std::map<Expr, std::string, ExprCompare> varMap;
   std::vector<Expr> localVars;
@@ -440,15 +444,18 @@ class HydrideEmitter : public IRVisitor {
   }
 
   void visit(const Malloc* op) {
-    taco_ierror << "Malloc node not supported in hydride translation.";
+    valid = false;
+    // taco_ierror << "Malloc node not supported in hydride translation.";
   }
 
   void visit(const Sizeof* op) {
-    taco_ierror << "Sizeof node not supported in hydride translation.";
+    valid = false;
+    // taco_ierror << "Sizeof node not supported in hydride translation.";
   }
 
   void visit(const GetProperty* op) {
-    taco_ierror << "GetProperty node not supported in hydride translation.";
+    valid = false;
+    // taco_ierror << "GetProperty node not supported in hydride translation.";
   }
 };
 
@@ -458,6 +465,7 @@ class ExprOptimizer : public IRRewriter {
 
  public:
   size_t vector_width = 1;
+  bool valid;
 
   ExprOptimizer(std::string benchmark_name, bool& mutated_exprs) : benchmark_name(benchmark_name), mutated_exprs(mutated_exprs) {}
 
@@ -487,9 +495,18 @@ class ExprOptimizer : public IRRewriter {
     ostream.open(file_name);
     HydrideEmitter hydride_emitter(ostream);
     // todo: calculate vector width
-    hydride_emitter.translate(&op, benchmark_name, expr_id, vector_width);
+    valid = hydride_emitter.translate(&op, benchmark_name, expr_id, vector_width);
     ostream.close();
     std::cout << "Writing racket code to file: " << file_name << std::endl;
+
+    if (!valid){
+      std::cout << "Invalid expression for vectorized synthesis:" << std::endl;
+      std::cout << "Deleting tmp files generated" << std::endl;
+      std::string cmd = "rm -f " + file_name;
+      int err = system(cmd.data());
+      taco_uassert(err == 0) << "Unable to delete temporary files generated." << std::endl;
+      return op;
+    }
 
     // 2. Actually synthesize the expression with Hydride.
     std::string cmd = "racket " + file_name;
@@ -633,11 +650,15 @@ class LoopOptimizer : public IRRewriter {
     Expr end       = rewrite(op->end);
     Expr increment = rewrite(op->increment);
 
+    expr_optimizer.valid = true;
     Stmt contents = rewrite(PopulateVectorWidths(op->vec_width).rewrite(op->contents));
-    stmt = For::make(var, start, end, (op->vec_width > 1) ? 
-                        Literal::make(increment.as<Literal>()->getIntValue() * op->vec_width, increment.type()) : increment,
-                     contents, op->kind, op->parallel_unit, op->unrollFactor, op->vec_width);
-
+    if (expr_optimizer.valid)
+      stmt = For::make(var, start, end, (op->vec_width > 1) ? 
+                           Literal::make(increment.as<Literal>()->getIntValue() * op->vec_width, increment.type()) : increment,
+                       contents, op->kind, op->parallel_unit, op->unrollFactor, op->vec_width);
+    else
+      stmt = op;
+    
     expr_optimizer.vector_width = 1;
     in_vectorizable_loop--;
   }

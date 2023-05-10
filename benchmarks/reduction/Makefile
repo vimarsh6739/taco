@@ -10,8 +10,3 @@ run:
 
 clean:
 	rm bin/*
-
-#
-# Generate shared lib
-# clang -g -shared -o libmain.so -fPIC /tmp/taco_tmp_PLDJKC/jq2sijnfs66c.c bin/llvm_shim_tydride.ll bin/tydride.ll.legalize.ll
-#

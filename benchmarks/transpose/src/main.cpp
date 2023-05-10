@@ -3,6 +3,8 @@
 #include <cstring>
 #include <taco.h>
 using namespace taco;
+#define ROWS 160
+#define COLS 256
 int main(int argc, char* argv[]) {
 
   // Preprocessing
@@ -18,41 +20,41 @@ int main(int argc, char* argv[]) {
   // Begin program
   std::default_random_engine gen(0);
   std::uniform_real_distribution<double> unif(0.0, 1.0);
-  Format   rm({Dense});
-  Tensor<int> C({1024}, rm);
-  Tensor<int> B({1024},rm);
-  for (int i = 0; i < 1024; ++i) {
-    C.insert({i}, i + 1);
-    B.insert({i}, i + 1);
+  Format   rm({Dense, Dense});
+
+  Tensor<int> Input({ROWS,COLS},rm);
+  for (int i = 0; i<ROWS; ++i) {
+    for(int j=0;j<COLS;++j){
+      Input.insert({i,j}, ROWS - i - 1 + j);
+    }
   }
-  B.pack();
-  C.pack();
+  Input.pack();
   std::cout << "Done Loading" << std::endl;
   
-  // Define output tensor
-  Tensor<int> A({1024}, rm);
+  // Define output tensors
+  Tensor<int> Output({COLS,ROWS},rm);
 
   // Index expressions
-  IndexVar i("i");
-  A(i) = B(i) + C(i) + 1;
-  
-  
-  IndexStmt stmt = A.getAssignment().concretize();
+  IndexVar i("i"),j("j");
+  Output(j,i) = Input(i,j);
+
+  IndexStmt stmt = Output.getAssignment().concretize();
 
   // Vectorized schedule
-  IndexVar i0("i0");
-  stmt = stmt.bound(i, i0, 1024, BoundType::MaxExact)
+  IndexVar i0("i0"),j0("j0");
+  stmt = stmt.bound(i, i0, ROWS, BoundType::MaxExact)
+             .bound(j, j0, COLS, BoundType::MaxExact)
              .parallelize(i0, ParallelUnit::CPUVector, OutputRaceStrategy::NoRaces);
 
-  A.compile(stmt, false, enableHydride);
+  Output.compile(stmt, false, enableHydride);
   std::cout << "DONE COMPILING" << std::endl;
 
-  A.assemble();
+  Output.assemble();
   std::cout << "DONE ASSEMBLING" << std::endl;
 
-  A.compute();
+  Output.compute();
   std::cout << "DONE COMPUTING" << std::endl;
-
+  
   // Write the output of the computation to file (stored in the Matrix Market format).
-  write(out_file, A);
+  write(out_file, Output);
 }

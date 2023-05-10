@@ -393,7 +393,7 @@ ir::Stmt simplify(const ir::Stmt& stmt) {
     // This might look like a DE-OPTIMIZATION, but it is necessary to 
     // synthesize vectorizing schedules in innermost For loops 
     void visit(const Store* op){
-      if (util::contains(defLevel,op->loc) && 
+      if (util::contains(defLevel, op->loc) && 
           defLevel.at(op->loc) < loopLevel){
             // unsafe candidate for copy prop.
         loopDependentVars.insert(op->loc);
@@ -433,15 +433,14 @@ ir::Stmt simplify(const ir::Stmt& stmt) {
         loopDependentVars(loopDependentVars) {}
 
     void visit(const For* op){
-      if(op->kind==LoopKind::Vectorized) forLoopLevel++;
+      if (op->kind==LoopKind::Vectorized) 
+        forLoopLevel++;
       Stmt contents = rewrite(op->contents);
-      if(contents == op->contents){
+      if (contents == op->contents)
         stmt = op;
-      }
-      else{
+      else
         stmt = For::make(op->var,op->start,op->end,op->increment,contents,op->kind,op->parallel_unit,op->unrollFactor,op->vec_width);
-      }
-      if(op->kind==LoopKind::Vectorized) forLoopLevel--;
+      if (op->kind == LoopKind::Vectorized) forLoopLevel--;
     }
 
     void visit(const Scope* scope) {
@@ -465,11 +464,11 @@ ir::Stmt simplify(const ir::Stmt& stmt) {
         varsToReplace.insert({decl->var, {rhs, stmt}});
         dependencies.insert({rhs, decl->var});//rhs->variable dependency
       }
-      else if(decl->var.type().isInt() && 
-              !util::contains(loopDependentVars,decl->var) && forLoopLevel>0){
+      else if (decl->var.type().isInt() && 
+              !util::contains(loopDependentVars, decl->var) && forLoopLevel > 0) {
         // Unlock aggressive copy propogation inside candidate vector-loop bodies
-        varsToReplace.insert({decl->var,{rhs,stmt}});
-        dependencies.insert({rhs,decl->var});
+        varsToReplace.insert({decl->var, {rhs, stmt}});
+        dependencies.insert({rhs, decl->var});
       }
     }
 
@@ -513,15 +512,15 @@ ir::Stmt simplify(const ir::Stmt& stmt) {
       // arr[loc] = data
       Expr loc = rewrite(store->loc);
       Expr data = rewrite(store->data);
-      stmt = (loc == store->loc && data == store->data)? store :
-              Store::make(store->arr,loc,data,store->use_atomics,store->atomic_parallel_unit,store->vector_width);
+      stmt = (loc == store->loc && data == store->data) ? store 
+          : Store::make(store->arr, loc, data, store->use_atomics, store->atomic_parallel_unit, store->vector_width);
     }
 
     void visit(const Load* load){
       // arr[loc]
       // Replace loc if possible
       Expr loc = rewrite(load->loc);
-      expr = (loc == load->loc)? load : Load::make(load->arr,loc,load->vector_width);
+      expr = (loc == load->loc)? load : Load::make(load->arr, loc, load->vector_width);
     }
 
     void visit(const Var* var) {
