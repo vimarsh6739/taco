@@ -6,10 +6,10 @@ build: setup src/main.cpp
 	g++ -std=c++11 -O3 -DNDEBUG -DTACO -I../../include -L../../build/lib src/main.cpp -o bin/main -ltaco
 
 run_taco:
-	LD_LIBRARY_PATH=../../build/lib ./bin/main taco
+	LD_LIBRARY_PATH=../../build/lib ./bin/main taco > /dev/null
 
 run_hydride:
-	LD_LIBRARY_PATH=../../build/lib ./bin/main hydride
+	LD_LIBRARY_PATH=../../build/lib ./bin/main hydride > /dev/null
 	
 clean:
 	rm -f bin/* tmp.txt *.tns

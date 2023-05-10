@@ -1,5 +1,6 @@
 !Makefile
 *.ll
 *.rkt
+*.tns
 main
 tmp.txt
