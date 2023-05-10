@@ -1,3 +1,12 @@
+
+# Tydride
+
+Run all of the benchmarks using `run_benchmark.sh`.
+
+
+---
+
+
 The Tensor Algebra Compiler (taco) is a C++ library that computes
 tensor algebra expressions on sparse and dense tensors.  It uses novel
 compiler techniques to get performance competitive with hand-optimized
